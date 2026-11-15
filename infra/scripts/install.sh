@@ -201,7 +201,8 @@ values = {
     "REALTIME_DB_ENC_KEY": rand(8),
 
     "SITE_URL": url,
-    "URI_ALLOW_LIST": f"{url}/**",
+    # The second entry lets sign-in return to the Motio iOS app.
+    "URI_ALLOW_LIST": f"{url}/**,net.nikog.motio.ios://auth",
     "API_EXTERNAL_URL": url,
     "APP_URL": url,
 
