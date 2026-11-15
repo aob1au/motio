@@ -126,7 +126,15 @@ describe("install.sh --env-only", () => {
     const values = Object.entries(env)
       .filter(([key]) => key !== "MOTIO_DOMAIN")
       .map(([, value]) => value)
-      .join("\n");
+      .join("\n")
+      // The iOS app's return address is an app identifier, not a server.
+      .replace("net.nikog.motio.ios://auth", "");
     expect(values).not.toMatch(/nikog|webtm/);
+  });
+
+  it("lets sign-in return to the site and to the iOS app, nowhere else", () => {
+    expect(env.URI_ALLOW_LIST).toBe(
+      "https://planner.example.com/**,net.nikog.motio.ios://auth",
+    );
   });
 });
