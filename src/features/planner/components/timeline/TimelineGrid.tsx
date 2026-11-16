@@ -324,7 +324,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
       try {
         if (typeof window === 'undefined') return {};
         const parsed: unknown = JSON.parse(
-          window.localStorage.getItem('motio-resource-height-v3') || '{}'
+          window.localStorage.getItem('motio-resource-height-v4') || '{}'
         );
         return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
           ? parsed as Record<string, Record<string, number>>
@@ -340,7 +340,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   useEffect(() => {
     try {
       window.localStorage.setItem(
-        'motio-resource-height-v3',
+        'motio-resource-height-v4',
         JSON.stringify(savedRowHeights),
       );
     } catch {
@@ -363,7 +363,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
         + geometry.rowBottomSpace
       : 0;
 
-    return Math.max(64, requiredBarSpace);
+    return Math.max(48, requiredBarSpace);
   }, [geometry, timeOffIndex]);
 
   const adjustedDisplayRows = useMemo(() => {
