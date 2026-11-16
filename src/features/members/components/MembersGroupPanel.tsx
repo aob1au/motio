@@ -257,7 +257,7 @@ export const MembersGroupPanel: React.FC<MembersGroupPanelProps> = ({
           {!groupMembersLoading && !groupMembersError && (
             <>
               {groupMembers.length === 0 ? (
-                <div className="text-sm text-muted-foreground">{t`No account members in this group.`}</div>
+                <div className="text-sm text-muted-foreground">{"No account members in this group."}</div>
               ) : (
                 <div className="space-y-2">
                   {groupMembers.map((member) => {
