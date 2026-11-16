@@ -133,6 +133,107 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sidebarContainerRef = useRef<HTMLDivElement>(null);
 
+  // Keep task text visible while horizontally scrolling, constrained
+  // to its own bar. No modification to dates, tasks or bar geometry.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let frame: number | null = null;
+
+    const repositionLabels = () => {
+      frame = null;
+
+      const viewport = container.getBoundingClientRect();
+      const sidebarRight =
+        sidebarContainerRef.current?.getBoundingClientRect().right
+        ?? viewport.left;
+
+      const visibleLeft = Math.max(viewport.left, sidebarRight) + 8;
+
+      const bars = container.querySelectorAll<HTMLElement>(
+        '.task-bar[data-task-id]'
+      );
+
+      bars.forEach(bar => {
+        const label = bar.querySelector<HTMLElement>(
+          '[data-floating-task-label]'
+        );
+        if (!label) return;
+
+        const bounds = bar.getBoundingClientRect();
+
+        // Ignore bars completely outside the visible timeline.
+        if (bounds.right <= visibleLeft ||
+            bounds.left >= viewport.right) {
+          return;
+        }
+
+        // The bar itself has 8px horizontal padding on each side.
+        const labelWidth = label.getBoundingClientRect().width;
+
+        const desiredOffset = Math.max(
+          0,
+          visibleLeft - bounds.left - 8
+        );
+
+        const maximumOffset = Math.max(
+          0,
+          bounds.width - labelWidth - 16
+        );
+
+        const offset = Math.round(
+          Math.min(desiredOffset, maximumOffset)
+        );
+
+        const transform = offset
+          ? `translateX(${offset}px)`
+          : '';
+
+        if (label.style.transform !== transform) {
+          label.style.transform = transform;
+        }
+      });
+    };
+
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(repositionLabels);
+    };
+
+    container.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+
+    // Reposition when task bars are mounted or replaced.
+    const observer = new MutationObserver(schedule);
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Account for sidebar resizing and viewport changes.
+    const resizeObserver = new ResizeObserver(schedule);
+    resizeObserver.observe(container);
+    if (sidebarContainerRef.current) {
+      resizeObserver.observe(sidebarContainerRef.current);
+    }
+
+    schedule();
+
+    return () => {
+      container.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      observer.disconnect();
+      resizeObserver.disconnect();
+
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+    };
+  }, []);
+
+
+
   const {
     isMobileAssigneeTimeline,
     sidebarMinWidth,

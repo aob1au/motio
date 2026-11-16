@@ -215,7 +215,10 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
           )}
 
           {/* Task content */}
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div
+              data-floating-task-label
+              className="flex min-w-0 w-max max-w-full flex-col justify-center gap-0.5"
+            >
             <div className="flex items-center gap-2 min-w-0">
               {status?.emoji && (
                 <span className="inline-flex h-4 w-4 flex-shrink-0 items-center justify-center text-sm leading-none">
