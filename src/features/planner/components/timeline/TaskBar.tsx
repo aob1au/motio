@@ -8,6 +8,7 @@ import { cn } from '@/shared/lib/classNames';
 import { formatProjectLabel } from '@/shared/lib/projectLabels';
 import { NORMAL_TIMELINE_GEOMETRY, type TimelineGeometry } from '@/features/planner/lib/timelineDensity';
 import { getTaskBarAppearance } from '@/features/planner/lib/taskBarColors';
+import { buildPersonColorMap } from '@/features/planner/lib/timeOffPalette';
 import { Ban, MessageSquare, RotateCw } from 'lucide-react';
 import { t } from '@lingui/macro';
 import { useLocaleStore } from '@/shared/store/localeStore';
@@ -54,6 +55,7 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
   // task types are only named in the tooltip, which reads them itself.
   const projects = usePlannerStore((state) => state.projects);
   const statuses = usePlannerStore((state) => state.statuses);
+  const assignees = usePlannerStore((state) => state.assignees);
   const setSelectedTaskId = usePlannerStore((state) => state.setSelectedTaskId);
   const setPeekedTaskId = usePlannerStore((state) => state.setPeekedTaskId);
   const setHighlightedTaskId = usePlannerStore((state) => state.setHighlightedTaskId);
@@ -115,13 +117,25 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
   };
   const isRepeating = Boolean(task.repeatId);
 
+  const resourceColors = useMemo(
+    () => buildPersonColorMap(assignees),
+    [assignees],
+  );
+
+  // Resource rows use their own person; project rows use the first
+  // person assigned to the task.
+  const colourAssigneeId = rowAssigneeId ?? task.assigneeIds[0];
+  const resourceColor = colourAssigneeId
+    ? resourceColors.get(colourAssigneeId)
+    : undefined;
+
   const fallbackProjectColor = projects.length === 1 ? projects[0]?.color : undefined;
   const appearance = useMemo(() => getTaskBarAppearance({
     fallbackProjectColor,
     priority: task.priority,
-    projectColor: project?.color,
+    projectColor: resourceColor ?? project?.color,
     status,
-  }), [fallbackProjectColor, project?.color, status, task.priority]);
+  }), [fallbackProjectColor, project?.color, resourceColor, status, task.priority]);
   const priorityMeta = task.priority && appearance.priorityVisual
     ? { ...appearance.priorityVisual, label: priorityLabels[task.priority] }
     : null;

@@ -33,8 +33,9 @@ export const buildAssigneeGroupMap = (
   const groupByUserId = new Map(memberGroupAssignments.map((assignment) => [assignment.userId, assignment.groupId]));
   const map = new Map<string, string>();
   assignees.forEach((assignee) => {
-    if (!assignee.userId) return;
-    const groupId = groupByUserId.get(assignee.userId);
+    const groupId = assignee.userId
+      ? groupByUserId.get(assignee.userId)
+      : assignee.groupId;
     if (groupId) {
       map.set(assignee.id, groupId);
     }

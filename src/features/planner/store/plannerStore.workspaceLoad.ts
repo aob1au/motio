@@ -190,7 +190,7 @@ export const loadFullWorkspaceData = async (
     .order('created_at', { ascending: true });
   const assigneesQuery = supabase
     .from('assignees')
-    .select('id, workspace_id, name, user_id, is_active, email, phone, color')
+    .select('id, workspace_id, name, user_id, group_id, is_active, email, phone, color')
     .eq('workspace_id', workspaceId);
   const projectMembersQuery = supabase
     .from('project_members')

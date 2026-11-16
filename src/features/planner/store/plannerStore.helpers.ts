@@ -76,6 +76,7 @@ export type AssigneeRow = {
   workspace_id: string;
   name: string;
   user_id: string | null;
+  group_id: string | null;
   is_active: boolean;
   email: string | null;
   phone: string | null;
@@ -350,6 +351,7 @@ export const mapAssigneeRow = (row: AssigneeRow): Assignee => ({
   id: row.id,
   name: row.name,
   userId: row.user_id,
+  groupId: row.group_id ?? null,
   isActive: row.is_active ?? true,
   email: row.email ?? null,
   phone: row.phone ?? null,

@@ -92,6 +92,7 @@ export interface Assignee {
    */
   timeOffMotif?: TimeOffMotifId;
   userId?: string | null;
+  groupId?: string | null;
   isActive: boolean;
   /** Phase 4: optional contact info shown in the project-card Team popup. */
   email: string | null;

@@ -1,15 +1,35 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '@/shared/lib/supabaseClient';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { usePlannerStore } from '@/features/planner/store/plannerStore';
 
 export const PlanningResourcesPanel: React.FC = () => {
   const role = useAuthStore(s => s.currentWorkspaceRole);
+  const workspaceId = useAuthStore(s => s.currentWorkspaceId);
   const assignees = usePlannerStore(s => s.assignees);
   const addAssignee = usePlannerStore(s => s.addAssignee);
   const updateAssignee = usePlannerStore(s => s.updateAssignee);
   const refreshAssignees = usePlannerStore(s => s.refreshAssignees);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState('');
+  const [groups, setGroups] = useState<Array<{id:string;name:string}>>([]);
+
+  useEffect(() => {
+    let alive = true;
+    setGroups([]);
+    if (!workspaceId) return;
+    void supabase.from('member_groups')
+      .select('id,name')
+      .eq('workspace_id', workspaceId)
+      .order('name')
+      .then(({data,error}) => {
+        if (!alive) return;
+        if (error) { setMessage(error.message); return; }
+        setGroups((data ?? []).map(g => ({id:g.id,name:g.name})));
+      });
+    return () => { alive = false; };
+  }, [workspaceId]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -23,6 +43,7 @@ export const PlanningResourcesPanel: React.FC = () => {
 
   const reset = () => {
     setEditingId(null);
+    setGroupId('');
     setName('');
     setEmail('');
     setPhone('');
@@ -30,6 +51,7 @@ export const PlanningResourcesPanel: React.FC = () => {
 
   const edit = (person: typeof people[number]) => {
     setEditingId(person.id);
+    setGroupId(person.groupId ?? '');
     setName(person.name);
     setEmail(person.email ?? '');
     setPhone(person.phone ?? '');
@@ -50,6 +72,10 @@ export const PlanningResourcesPanel: React.FC = () => {
           phone: phone.trim() || null,
         });
         if (result.error) throw new Error(result.error);
+        const {error: groupError} = await supabase.from('assignees')
+          .update({group_id: groupId || null})
+          .eq('id', editingId).eq('workspace_id', workspaceId!);
+        if (groupError) throw groupError;
       } else {
         const before = new Set(assignees.map(p => p.id));
         await addAssignee({
@@ -61,8 +87,13 @@ export const PlanningResourcesPanel: React.FC = () => {
         });
         await refreshAssignees();
         const after = usePlannerStore.getState().assignees;
-        if (!after.some(p => !before.has(p.id))) {
-          throw new Error('Resource was not created. Check permissions.');
+        const created = after.find(p => !before.has(p.id));
+        if (!created) throw new Error('Resource was not created. Check permissions.');
+        if (groupId) {
+          const {error: groupError} = await supabase.from('assignees')
+            .update({group_id:groupId})
+            .eq('id',created.id).eq('workspace_id',workspaceId!);
+          if (groupError) throw groupError;
         }
       }
 
@@ -125,6 +156,15 @@ export const PlanningResourcesPanel: React.FC = () => {
             value={phone}
             onChange={e => setPhone(e.target.value)}
           />
+          <select
+            aria-label="Resource group"
+            className="rounded border bg-background px-3 py-2"
+            value={groupId}
+            onChange={e => setGroupId(e.target.value)}
+          >
+            <option value="">No group</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
           <button
             type="submit"
             disabled={busy}
@@ -155,6 +195,7 @@ export const PlanningResourcesPanel: React.FC = () => {
               <div className="font-medium">{person.name}</div>
               <div className="text-xs text-muted-foreground">
                 {person.isActive ? 'Active' : 'Inactive'}
+                {' · ' + (groups.find(g => g.id === person.groupId)?.name ?? 'No group')}
                 {person.email ? ` · ${person.email}` : ''}
               </div>
             </div>
