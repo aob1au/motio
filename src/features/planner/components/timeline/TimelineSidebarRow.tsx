@@ -75,8 +75,78 @@ const TimelineSidebarRowBase: React.FC<TimelineSidebarRowProps> = ({
       className={cn(
         'sticky left-0 z-10 flex-shrink-0 border-r border-border bg-timeline-header',
       )}
-      style={{ width, height: row.height }}
+      style={{ width, height: row.height, position: 'relative' }}
     >
+      {groupMode === 'assignee' && row.id !== 'unassigned' && (
+        <div
+          role="separator"
+          aria-label={`Resize ${row.name} row; double-click to auto-fit`}
+          aria-orientation="horizontal"
+          tabIndex={0}
+          title="Drag to resize · Double-click to auto-fit"
+          className="absolute bottom-0 left-0 right-0 z-30 h-2 cursor-row-resize hover:bg-primary/20"
+          onPointerDown={(event: React.PointerEvent<HTMLDivElement>) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+
+            const startY = event.clientY;
+            const startHeight = row.height;
+
+            const sendHeight = (height: number | null) => {
+              window.dispatchEvent(new CustomEvent(
+                'motio:resource-row-height',
+                { detail: { id: row.id, height } }
+              ));
+            };
+
+            const onMove = (move: PointerEvent) => {
+              sendHeight(Math.max(
+                64,
+                Math.round(startHeight + move.clientY - startY),
+              ));
+            };
+
+            const onStop = () => {
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onStop);
+              window.removeEventListener('pointercancel', onStop);
+            };
+
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onStop);
+            window.addEventListener('pointercancel', onStop);
+          }}
+          onDoubleClick={(event) => {
+            event.stopPropagation();
+            window.dispatchEvent(new CustomEvent(
+              'motio:resource-row-height',
+              { detail: { id: row.id, height: null } }
+            ));
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Home') {
+              event.preventDefault();
+              window.dispatchEvent(new CustomEvent(
+                'motio:resource-row-height',
+                { detail: { id: row.id, height: null } }
+              ));
+            } else if (
+              event.key === 'ArrowUp' || event.key === 'ArrowDown'
+            ) {
+              event.preventDefault();
+              const change = event.key === 'ArrowDown' ? 8 : -8;
+              window.dispatchEvent(new CustomEvent(
+                'motio:resource-row-height',
+                { detail: {
+                  id: row.id,
+                  height: Math.max(64, row.height + change),
+                }}
+              ));
+            }
+          }}
+        />
+      )}
       <div
         className={cn(
           'flex h-full box-border transition-colors',

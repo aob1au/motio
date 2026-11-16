@@ -1,3 +1,4 @@
+import * as ReactRowResize from 'react';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { t } from '@lingui/macro';
@@ -172,9 +173,69 @@ export const useTaskDisplayRows = ({
     [filteredTasks, groupItems, groupMode, reservedLaneZeroByRow, layoutKey],
   );
 
-  const effectiveMinRowHeight = groupMode === 'assignee' && geometry.tieredAvatars
-    ? Math.max(geometry.minRowHeight, resolveAssigneeMinRowHeight(sidebarViewportWidth))
+  const effectiveMinRowHeight = groupMode === 'assignee'
+    ? Math.max(
+        64,
+        geometry.minRowHeight,
+        geometry.tieredAvatars
+          ? resolveAssigneeMinRowHeight(sidebarViewportWidth)
+          : 0,
+      )
     : geometry.minRowHeight;
+
+  // Manual resource row heights, saved per browser.
+  const [manualResourceRowHeights, setManualResourceRowHeights] =
+    ReactRowResize.useState<Record<string, number>>(() => {
+      try {
+        return JSON.parse(
+          window.localStorage.getItem('motio-resource-row-heights-v1') || '{}'
+        ) as Record<string, number>;
+      } catch {
+        return {};
+      }
+    });
+
+  ReactRowResize.useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'motio-resource-row-heights-v1',
+        JSON.stringify(manualResourceRowHeights),
+      );
+    } catch {
+      // Private browsing or blocked storage must not break the planner.
+    }
+  }, [manualResourceRowHeights]);
+
+  ReactRowResize.useEffect(() => {
+    const handleResize = (event: Event) => {
+      if (groupMode !== 'assignee') return;
+      const detail = (
+        event as CustomEvent<{ id: string; height: number | null }>
+      ).detail;
+      if (!detail?.id) return;
+
+      setManualResourceRowHeights(previous => {
+        const key = `assignee:${detail.id}`;
+        const next = { ...previous };
+
+        if (detail.height === null) {
+          delete next[key];
+        } else {
+          // Display row includes Motio's normal resource-row gap.
+          next[key] = Math.max(
+            effectiveMinRowHeight,
+            Math.round(detail.height - ASSIGNEE_ROW_GAP),
+          );
+        }
+        return next;
+      });
+    };
+
+    window.addEventListener('motio:resource-row-height', handleResize);
+    return () => {
+      window.removeEventListener('motio:resource-row-height', handleResize);
+    };
+  }, [groupMode, effectiveMinRowHeight]);
 
   // A row carrying a bar needs at least one lane even when it has no tasks; the
   // lanes tasks actually use are already packed around the bar.
@@ -196,15 +257,24 @@ export const useTaskDisplayRows = ({
       rowTopPadding: geometry.rowTopPadding,
       rowBottomSpace: geometry.rowBottomSpace,
     });
-    const previousHeights = readLayoutMemory()?.heights;
-    if (!previousHeights) return heights;
-    Object.keys(heights).forEach((rowId) => {
-      const previous = previousHeights[rowId];
-      if (previous !== undefined && previous > heights[rowId]) heights[rowId] = previous;
-    });
+    // Automatic height always fits task lanes. A manual value can enlarge
+    // the row, but never clip overlapping tasks or the resource details.
+    if (groupMode === 'assignee') {
+      groupItems.forEach(item => {
+        const manual = manualResourceRowHeights[`assignee:${item.id}`];
+        if (typeof manual === 'number' && Number.isFinite(manual)) {
+          heights[item.id] = Math.max(
+            heights[item.id] ?? effectiveMinRowHeight,
+            manual,
+          );
+        }
+      });
+    }
     return heights;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the memory is read, not tracked (see above)
-  }, [tasksByRow, effectiveMinRowHeight, minLanesByRow, layoutKey, geometry]);
+  }, [
+    tasksByRow, effectiveMinRowHeight, minLanesByRow, layoutKey,
+    geometry, groupMode, groupItems, manualResourceRowHeights,
+  ]);
 
   useEffect(() => {
     const lanesByRow = new Map<string, Map<string, RememberedLane>>();
