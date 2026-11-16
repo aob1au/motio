@@ -325,7 +325,7 @@ export const loadFullWorkspaceData = async (
   const assignees = assigneeRows
     .filter((row) => {
       if (adminUserId && row.user_id === adminUserId) return false;
-      return row.user_id !== null || taskAssigneeIds.has(row.id);
+      return true; // Include planning-only resources.
     })
     .sort((left, right) => left.name.localeCompare(right.name))
     .map(mapAssigneeRow)

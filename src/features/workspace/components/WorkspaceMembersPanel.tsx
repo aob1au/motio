@@ -16,6 +16,7 @@ import { WorkspaceMemberRow, type WorkspaceMemberSummary } from '@/features/work
 import { WorkspaceLeaveDialogs } from '@/features/workspace/components/WorkspaceLeaveDialogs';
 import { useLeaveWorkspace } from '@/features/workspace/hooks/useLeaveWorkspace';
 import { WorkspaceInviteSection } from '@/features/workspace/components/WorkspaceInviteSection';
+import { PlanningResourcesPanel } from './PlanningResourcesPanel';
 import { useWorkspaceInvites } from '@/features/workspace/hooks/useWorkspaceInvites';
 import { useIsDemo } from '@/features/demo/hooks/useIsDemo';
 import { useDemoConversion } from '@/features/demo/providers/DemoConversionProvider';
@@ -378,6 +379,8 @@ export const WorkspaceMembersPanel: React.FC<WorkspaceMembersPanelProps> = ({
           </p>
         </div>
       )}
+
+      {accessTab === 'active' && <PlanningResourcesPanel />}
 
       {!isAdmin && (
         <Alert>
