@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePlannerStore } from '@/features/planner/store/plannerStore';
 import { GroupMode } from '@/features/planner/types/planner';
 import { TimelineDisplayRow } from '@/features/planner/lib/timelineSelectors';
 import { cn } from '@/shared/lib/classNames';
@@ -38,10 +39,10 @@ export const resolveAssigneeAvatarSize = (sidebarWidth: number): AvatarSize => {
 };
 
 export const resolveAssigneeMinRowHeight = (sidebarWidth: number): number => {
-  if (sidebarWidth >= ASSIGNEE_AVATAR_TIER_BREAKPOINTS.wide) return 128;
-  if (sidebarWidth >= ASSIGNEE_AVATAR_TIER_BREAKPOINTS.medium) return 104;
-  if (sidebarWidth >= ASSIGNEE_AVATAR_TIER_BREAKPOINTS.compact) return 88;
-  return 72;
+  if (sidebarWidth >= ASSIGNEE_AVATAR_TIER_BREAKPOINTS.wide) return 76;
+  if (sidebarWidth >= ASSIGNEE_AVATAR_TIER_BREAKPOINTS.medium) return 72;
+  if (sidebarWidth >= ASSIGNEE_AVATAR_TIER_BREAKPOINTS.compact) return 68;
+  return 64;
 };
 
 // Shared styling for the avatar-click profile popover (desktop and mobile).
@@ -56,15 +57,16 @@ const TimelineSidebarRowBase: React.FC<TimelineSidebarRowProps> = ({
   width,
   isMobile,
   isMobileAssigneeTimeline,
-  sidebarViewportWidth,
   groupMode,
   getMonogram,
   getAvatarInfo,
-  smallPhotos = false,
 }) => {
+  const phone = usePlannerStore(
+    state => state.assignees.find(person => person.id === row.id)?.phone ?? null
+  );
   const isAssignee = groupMode === 'assignee';
   const showAssigneeAvatar = isAssignee && row.id !== 'unassigned';
-  const avatarSize: AvatarSize = smallPhotos ? 'xs' : resolveAssigneeAvatarSize(sidebarViewportWidth);
+  const avatarSize: AvatarSize = 'sm';
 
   return (
     <div
@@ -83,9 +85,7 @@ const TimelineSidebarRowBase: React.FC<TimelineSidebarRowProps> = ({
             : cn(
                 'border-b border-border hover:bg-timeline-row-hover',
                 isAssignee
-                  ? (smallPhotos
-                    ? cn('items-center gap-2 py-1', isMobile ? 'px-2' : 'px-3')
-                    : cn('flex-col items-center justify-center gap-1 py-2', isMobile ? 'px-2' : 'px-3'))
+                  ? cn('flex-row items-center gap-3 py-2', isMobile ? 'px-2' : 'px-4')
                   : cn('items-center gap-2', isMobile ? 'px-3' : 'px-4'),
               ),
         )}
@@ -162,16 +162,22 @@ const TimelineSidebarRowBase: React.FC<TimelineSidebarRowProps> = ({
                 </Popover>
               );
             })() : null}
-            <span
-              className={cn(
-                smallPhotos ? 'min-w-0 flex-1 text-left line-clamp-2' : 'w-full text-center',
-                'font-medium text-foreground whitespace-normal break-words [overflow-wrap:anywhere] leading-tight',
-                isMobile ? 'text-[11px]' : 'text-xs',
+            <div className="min-w-0 flex-1 flex-col justify-center gap-0.5 text-left">
+              <div
+                className="truncate text-sm font-semibold leading-snug text-foreground"
+                title={row.name}
+              >
+                {row.name}
+              </div>
+              {phone && (
+                <div
+                  className="truncate text-xs leading-snug text-muted-foreground"
+                  title={phone}
+                >
+                  {phone}
+                </div>
               )}
-              title={row.name}
-            >
-              {row.name}
-            </span>
+            </div>
           </>
         ) : (
           <div className="min-w-0 flex flex-1 items-center gap-3">
