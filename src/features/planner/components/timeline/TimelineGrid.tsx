@@ -324,7 +324,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
       try {
         if (typeof window === 'undefined') return {};
         const parsed: unknown = JSON.parse(
-          window.localStorage.getItem('motio-resource-height-v4') || '{}'
+          window.localStorage.getItem('motio-resource-height-v5') || '{}'
         );
         return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
           ? parsed as Record<string, Record<string, number>>
@@ -340,7 +340,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   useEffect(() => {
     try {
       window.localStorage.setItem(
-        'motio-resource-height-v4',
+        'motio-resource-height-v5',
         JSON.stringify(savedRowHeights),
       );
     } catch {
@@ -356,14 +356,13 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
       timeOffIndex.byRowId.get(row.id) ?? []
     );
     const lanes = Math.max(1, taskLanes, absenceLanes);
-    const requiredBarSpace = lanes > 0
-      ? geometry.rowTopPadding
-        + lanes * (geometry.taskHeight + geometry.taskGap)
-        - geometry.taskGap
-        + geometry.rowBottomSpace
-      : 0;
+    // Compact resource rows: one task lane plus 8px padding
+    // above and below. No additional invisible task lane.
+    const requiredBarSpace =
+      8 + lanes * geometry.taskHeight
+      + (lanes - 1) * geometry.taskGap + 8;
 
-    return Math.max(48, requiredBarSpace);
+    return Math.max(56, requiredBarSpace);
   }, [geometry, timeOffIndex]);
 
   const adjustedDisplayRows = useMemo(() => {
