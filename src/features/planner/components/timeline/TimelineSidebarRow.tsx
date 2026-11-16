@@ -79,7 +79,7 @@ const TimelineSidebarRowBase: React.FC<TimelineSidebarRowProps> = ({
       data-testid={`timeline-sidebar-row-${row.id}`}
       data-timeline-sidebar="row"
       className={cn(
-        'sticky left-0 z-10 relative flex-shrink-0 border-r border-border bg-timeline-header',
+        'sticky left-0 z-10 flex-shrink-0 border-r border-border bg-timeline-header',
       )}
       style={{ width, height: row.height }}
     >
