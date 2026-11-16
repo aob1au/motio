@@ -324,7 +324,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
       try {
         if (typeof window === 'undefined') return {};
         const parsed: unknown = JSON.parse(
-          window.localStorage.getItem('motio-resource-height-v2') || '{}'
+          window.localStorage.getItem('motio-resource-height-v3') || '{}'
         );
         return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
           ? parsed as Record<string, Record<string, number>>
@@ -340,7 +340,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   useEffect(() => {
     try {
       window.localStorage.setItem(
-        'motio-resource-height-v2',
+        'motio-resource-height-v3',
         JSON.stringify(savedRowHeights),
       );
     } catch {
@@ -361,7 +361,6 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
         + lanes * (geometry.taskHeight + geometry.taskGap)
         - geometry.taskGap
         + geometry.rowBottomSpace
-        + 20
       : 0;
 
     return Math.max(64, requiredBarSpace);
@@ -374,7 +373,10 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
       if (row.id === 'unassigned') return row;
       const override = workspaceRowHeights[row.id];
       if (typeof override !== 'number' || !Number.isFinite(override)) {
-        return row;
+        return {
+          ...row,
+          height: rowContentMinHeight(row),
+        };
       }
       return {
         ...row,
