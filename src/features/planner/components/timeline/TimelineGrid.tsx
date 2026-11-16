@@ -355,7 +355,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     const absenceLanes = timeOffMinLanes(
       timeOffIndex.byRowId.get(row.id) ?? []
     );
-    const lanes = Math.max(taskLanes, absenceLanes);
+    const lanes = Math.max(1, taskLanes, absenceLanes);
     const requiredBarSpace = lanes > 0
       ? geometry.rowTopPadding
         + lanes * (geometry.taskHeight + geometry.taskGap)
