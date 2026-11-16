@@ -122,16 +122,7 @@ export const PlanningResourcesPanel: React.FC = () => {
     }
   };
 
-  return (
-    <section className="rounded-lg border bg-background p-4 space-y-4">
-      <div>
-        <h3 className="font-semibold">Planning-only resources</h3>
-        <p className="text-xs text-muted-foreground">
-          Manage people without creating login accounts or invitations.
-        </p>
-      </div>
-
-      {canEdit && (
+  const resourceForm = (
         <form onSubmit={save} className="flex flex-wrap gap-2">
           <input
             className="rounded border bg-background px-3 py-2"
@@ -178,9 +169,21 @@ export const PlanningResourcesPanel: React.FC = () => {
             </button>
           )}
         </form>
-      )}
+  );
+  return (
+    <section className="rounded-lg border bg-background p-4 space-y-4">
+      <div>
+        <h3 className="font-semibold">Planning-only resources</h3>
+        <p className="text-xs text-muted-foreground">
+          Manage people without creating login accounts or invitations.
+        </p>
+      </div>
 
-      {message && <p role="status" className="text-sm">{message}</p>}
+      {canEdit && !editingId && resourceForm}
+
+      {message && !editingId && (
+        <p role="status" className="text-sm">{message}</p>
+      )}
 
       <div className="space-y-2">
         {people.length === 0 && (
@@ -189,8 +192,8 @@ export const PlanningResourcesPanel: React.FC = () => {
           </p>
         )}
         {people.map(person => (
-          <div key={person.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
+          <div key={person.id} className="rounded border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="font-medium">{person.name}</div>
               <div className="text-xs text-muted-foreground">
@@ -210,6 +213,20 @@ export const PlanningResourcesPanel: React.FC = () => {
                   disabled={busy} className="rounded border px-3 py-1">
                   {person.isActive ? 'Deactivate' : 'Reactivate'}
                 </button>
+              </div>
+            )}
+            </div>
+            {canEdit && editingId === person.id && (
+              <div className="mt-3 border-t pt-3">
+                <div className="mb-3 text-sm font-semibold">
+                  Editing {person.name}
+                </div>
+                {resourceForm}
+                {message && (
+                  <p role="status" className="mt-2 text-sm">
+                    {message}
+                  </p>
+                )}
               </div>
             )}
           </div>
