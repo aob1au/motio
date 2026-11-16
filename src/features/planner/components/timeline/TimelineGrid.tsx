@@ -172,7 +172,88 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     myProfilePreferences,
   });
 
-  const dayWidth = useMemo(() => getDayWidth(viewMode), [viewMode]);
+  // Compact date columns, with optional user resizing.
+  // One dayWidth is shared by headers, bars, gridlines and milestones.
+  const [savedColumnWidths, setSavedColumnWidths] =
+    useState<Record<string, number>>(() => {
+      try {
+        if (typeof window === 'undefined') return {};
+        const data: unknown = JSON.parse(
+          window.localStorage.getItem('motio-column-widths-v1') || '{}'
+        );
+        return data && typeof data === 'object' && !Array.isArray(data)
+          ? data as Record<string, number>
+          : {};
+      } catch {
+        return {};
+      }
+    });
+
+  // Use the compact default in every view, including where Motio's
+  // built-in width is larger. The minimum is 56px.
+  const defaultDayWidth = Math.max(
+    56, Math.min(64, getDayWidth(viewMode))
+  );
+
+  const savedDayWidth = savedColumnWidths[viewMode];
+
+  const dayWidth = typeof savedDayWidth === 'number'
+    && Number.isFinite(savedDayWidth)
+    ? Math.max(56, Math.min(240, savedDayWidth))
+    : defaultDayWidth;
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'motio-column-widths-v1',
+        JSON.stringify(savedColumnWidths),
+      );
+    } catch {
+      // The timeline must work even if storage is unavailable.
+    }
+  }, [savedColumnWidths]);
+
+  const handleColumnResizeStart = useCallback((
+    event: React.PointerEvent<HTMLDivElement>
+  ) => {
+    if (event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startWidth = dayWidth;
+
+    const onMove = (pointer: PointerEvent) => {
+      const delta = pointer.clientX - startX;
+      const nextWidth = Math.max(
+        56, Math.min(240, Math.round(startWidth + delta))
+      );
+
+      setSavedColumnWidths(previous => ({
+        ...previous,
+        [viewMode]: nextWidth,
+      }));
+    };
+
+    const onStop = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onStop);
+      window.removeEventListener('pointercancel', onStop);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onStop);
+    window.addEventListener('pointercancel', onStop);
+  }, [dayWidth, viewMode]);
+
+  const handleColumnResizeReset = useCallback(() => {
+    setSavedColumnWidths(previous => {
+      const next = { ...previous };
+      delete next[viewMode];
+      return next;
+    });
+  }, [viewMode]);
   const rangeShifting = useRangeShifting(`${visibleDays[0]?.getTime() ?? ''}|${dayWidth}`);
   const totalWidth = visibleDays.length * dayWidth;
   const totalSurfaceWidth = `calc(${resolvedSidebarWidth} + ${totalWidth}px)`;
@@ -477,6 +558,8 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     <TimelineHeader
       visibleDays={visibleDays}
       dayWidth={dayWidth}
+      onColumnResizeStart={handleColumnResizeStart}
+      onColumnResizeReset={handleColumnResizeReset}
       viewMode={viewMode}
       isMobile={isMobile}
       attentionDate={timelineAttentionDate}
@@ -484,7 +567,12 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
       holidayDates={holidayDates}
       onDateContextAction={canEdit ? handleCreateMilestone : undefined}
     />
-  ), [visibleDays, dayWidth, viewMode, isMobile, timelineAttentionDate, todayKey, holidayDates, canEdit, handleCreateMilestone]);
+  ), [
+    visibleDays, dayWidth, viewMode, isMobile,
+    timelineAttentionDate, todayKey, holidayDates,
+    canEdit, handleCreateMilestone,
+    handleColumnResizeStart, handleColumnResizeReset,
+  ]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 

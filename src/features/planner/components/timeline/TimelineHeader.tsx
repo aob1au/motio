@@ -18,6 +18,10 @@ import { isWeekNumbersEnabled, weekNumberForColumn } from '@/features/planner/li
 interface TimelineHeaderProps {
   visibleDays: Date[];
   dayWidth: number;
+  onColumnResizeStart?: (
+    event: React.PointerEvent<HTMLDivElement>
+  ) => void;
+  onColumnResizeReset?: () => void;
   viewMode: ViewMode;
   isMobile?: boolean;
   attentionDate: string | null;
@@ -29,6 +33,8 @@ interface TimelineHeaderProps {
 const TimelineHeaderBase: React.FC<TimelineHeaderProps> = ({
   visibleDays,
   dayWidth,
+  onColumnResizeStart,
+  onColumnResizeReset,
   viewMode,
   attentionDate,
   todayKey,
@@ -79,6 +85,33 @@ const TimelineHeaderBase: React.FC<TimelineHeaderProps> = ({
                       : undefined
                   }
                 >
+                  {onColumnResizeStart && (
+                    <div
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize timeline date columns"
+                      tabIndex={0}
+                      title="Drag to resize all date columns; double-click to reset"
+                      className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize hover:bg-primary/25"
+                      style={{ touchAction: 'none' }}
+                      onPointerDown={event => {
+                        event.stopPropagation();
+                        onColumnResizeStart(event);
+                      }}
+                      onDoubleClick={event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onColumnResizeReset?.();
+                      }}
+                      onClick={event => event.stopPropagation()}
+                      onKeyDown={event => {
+                        if (event.key === 'Home') {
+                          event.preventDefault();
+                          onColumnResizeReset?.();
+                        }
+                      }}
+                    />
+                  )}
                   {weekNumber !== null && (
                     // Sits in the free strip above the weekday; never wraps, so in
                     // the narrow Week view it runs over the next column instead.
