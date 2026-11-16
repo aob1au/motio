@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlannerStore } from '@/features/planner/store/plannerStore';
 import { useTaskSearchStore } from '@/features/planner/store/taskSearchStore';
 import { isSearchableQuery } from '@/shared/domain/taskSearch';
@@ -12,7 +12,7 @@ import { TimeOffEditDialog } from './TimeOffEditDialog';
 import { MilestoneLayer } from './MilestoneLayer';
 import { getVisibleDays, getDayWidth } from '@/features/planner/lib/dateUtils';
 import { ViewMode } from '@/features/planner/types/planner';
-import { NO_TIME_OFF } from '@/features/planner/lib/timeOff';
+import { NO_TIME_OFF, timeOffMinLanes } from '@/features/planner/lib/timeOff';
 import { resolveTimelineSidebarWidth } from '@/features/planner/lib/timelineSidebarWidth';
 import {
   buildAssigneeGroupMap,
@@ -316,6 +316,137 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     layoutScope: `${currentWorkspaceId ?? ''}|${viewMode}`,
   });
 
+
+  // Resource-specific overrides. The normal Motio layout is unchanged.
+  // Both sidebar and timeline receive these same display-row objects.
+  const [savedRowHeights, setSavedRowHeights] =
+    useState<Record<string, Record<string, number>>>(() => {
+      try {
+        if (typeof window === 'undefined') return {};
+        const parsed: unknown = JSON.parse(
+          window.localStorage.getItem('motio-resource-height-v2') || '{}'
+        );
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? parsed as Record<string, Record<string, number>>
+          : {};
+      } catch {
+        return {};
+      }
+    });
+
+  const rowHeightWorkspace = currentWorkspaceId ?? 'default';
+  const workspaceRowHeights = savedRowHeights[rowHeightWorkspace] ?? {};
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'motio-resource-height-v2',
+        JSON.stringify(savedRowHeights),
+      );
+    } catch {
+      // Storage unavailable: resizing still works for this session.
+    }
+  }, [savedRowHeights]);
+
+  const rowContentMinHeight = useCallback((row: typeof displayRows[number]) => {
+    const taskLanes = row.tasks.reduce(
+      (maximum, task) => Math.max(maximum, task.lane + 1), 0
+    );
+    const absenceLanes = timeOffMinLanes(
+      timeOffIndex.byRowId.get(row.id) ?? []
+    );
+    const lanes = Math.max(taskLanes, absenceLanes);
+    const requiredBarSpace = lanes > 0
+      ? geometry.rowTopPadding
+        + lanes * (geometry.taskHeight + geometry.taskGap)
+        - geometry.taskGap
+        + geometry.rowBottomSpace
+        + 20
+      : 0;
+
+    return Math.max(64, requiredBarSpace);
+  }, [geometry, timeOffIndex]);
+
+  const adjustedDisplayRows = useMemo(() => {
+    if (groupMode !== 'assignee') return displayRows;
+
+    return displayRows.map(row => {
+      if (row.id === 'unassigned') return row;
+      const override = workspaceRowHeights[row.id];
+      if (typeof override !== 'number' || !Number.isFinite(override)) {
+        return row;
+      }
+      return {
+        ...row,
+        height: Math.max(
+          rowContentMinHeight(row),
+          Math.min(800, override),
+        ),
+      };
+    });
+  }, [displayRows, groupMode, workspaceRowHeights, rowContentMinHeight]);
+
+  const setResourceRowHeight = useCallback((
+    rowId: string,
+    height: number | null,
+  ) => {
+    setSavedRowHeights(previous => {
+      const updated = {
+        ...(previous[rowHeightWorkspace] ?? {}),
+      };
+      if (height === null) {
+        delete updated[rowId];
+      } else {
+        updated[rowId] = height;
+      }
+      return {
+        ...previous,
+        [rowHeightWorkspace]: updated,
+      };
+    });
+  }, [rowHeightWorkspace]);
+
+  const handleResourceRowResizeStart = useCallback((
+    event: React.PointerEvent<HTMLDivElement>,
+    rowId: string,
+    currentHeight: number,
+    minimumHeight: number,
+  ) => {
+    if (event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startY = event.clientY;
+    const startHeight = currentHeight;
+    let moved = false;
+
+    const onMove = (pointer: PointerEvent) => {
+      const delta = pointer.clientY - startY;
+      if (Math.abs(delta) < 2 && !moved) return;
+      moved = true;
+      const next = Math.min(
+        800,
+        Math.max(minimumHeight, Math.round(startHeight + delta)),
+      );
+      setResourceRowHeight(rowId, next);
+    };
+
+    const onStop = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onStop);
+      window.removeEventListener('pointercancel', onStop);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onStop);
+    window.addEventListener('pointercancel', onStop);
+  }, [setResourceRowHeight]);
+
+  const handleResourceRowResizeReset = useCallback((rowId: string) => {
+    setResourceRowHeight(rowId, null);
+  }, [setResourceRowHeight]);
+
   // ─── Other handlers ────────────────────────────────────────────────────────
 
   const handleJumpToToday = () => {
@@ -489,7 +620,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
             </div>
 
             {/* Timeline rows */}
-            {displayRows.map((row, rowIndex) => (
+            {adjustedDisplayRows.map((row, rowIndex) => (
               <div
                 key={row.id}
                 className="flex"
@@ -505,6 +636,14 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                   getMonogram={getSidebarRowMonogram}
                   getAvatarInfo={getAssigneeAvatarInfo}
                   smallPhotos={!geometry.tieredAvatars}
+                  onResizeStart={groupMode === 'assignee' && !isMobile
+                    ? (event, id) => handleResourceRowResizeStart(
+                        event, id, row.height, rowContentMinHeight(row)
+                      )
+                    : undefined}
+                  onResizeReset={groupMode === 'assignee' && !isMobile
+                    ? handleResourceRowResizeReset
+                    : undefined}
                 />
                 <div
                   data-testid={`timeline-task-row-${row.id}`}
