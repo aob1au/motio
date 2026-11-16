@@ -5,6 +5,7 @@ import { WorkspaceRole } from '@/features/auth/store/authStore';
 import { Assignee } from '@/features/planner/types/planner';
 import { PlannerGroup, PlannerGroupMember } from '@/features/planner/store/plannerStore.contract';
 import { AvailableGroupMember, buildAvailableGroupMembers } from '@/features/members/lib/memberSelectors';
+import { PlanningGroupResources } from './PlanningGroupResources';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -256,7 +257,7 @@ export const MembersGroupPanel: React.FC<MembersGroupPanelProps> = ({
           {!groupMembersLoading && !groupMembersError && (
             <>
               {groupMembers.length === 0 ? (
-                <div className="text-sm text-muted-foreground">{t`No members in this group.`}</div>
+                <div className="text-sm text-muted-foreground">{t`No account members in this group.`}</div>
               ) : (
                 <div className="space-y-2">
                   {groupMembers.map((member) => {
@@ -327,6 +328,10 @@ export const MembersGroupPanel: React.FC<MembersGroupPanelProps> = ({
               )}
             </>
           )}
+          <PlanningGroupResources
+            groupId={selectedGroup.id}
+            isAdmin={isAdmin}
+          />
         </div>
       )}
 
