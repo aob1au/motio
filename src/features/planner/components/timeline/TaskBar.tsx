@@ -110,6 +110,13 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
 
   const project = projects.find(p => p.id === task.projectId);
   const status = statuses.find(s => s.id === task.statusId);
+  // Show the resource assigned to this particular timeline row.
+  // On project rows, use the first assigned resource.
+  const displayedResourceId = rowAssigneeId ?? task.assigneeIds?.[0];
+  const displayedResourceName = displayedResourceId
+    ? assignees.find(person => person.id === displayedResourceId)?.name
+    : undefined;
+
   const priorityLabels: Record<TaskPriority, string> = {
     low: t`Low priority`,
     medium: t`Medium priority`,
@@ -248,6 +255,11 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
                     {titleParts[2]}
                   </>
                 ) : task.title}
+                {displayedResourceName && (
+                  <span className="font-normal">
+                    {' — '}{displayedResourceName}
+                  </span>
+                )}
               </span>
             </div>
             {geometry.twoLineBars && (
