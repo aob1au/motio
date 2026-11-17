@@ -26,6 +26,10 @@ export const PlanningGroupResources: React.FC<Props> = ({
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [notesPersonId, setNotesPersonId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [notesBusy, setNotesBusy] = useState(false);
+  const [notesError, setNotesError] = useState('');
 
   const planningResources = useMemo(
     () => assignees.filter(person => !person.userId),
@@ -85,6 +89,71 @@ export const PlanningGroupResources: React.FC<Props> = ({
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openNotes(personId: string) {
+    if (notesBusy || !workspaceId) return;
+
+    if (notesPersonId === personId) {
+      setNotesPersonId(null);
+      setNotesError('');
+      return;
+    }
+
+    setNotesBusy(true);
+    setNotesError('');
+
+    try {
+      const { data, error: loadError } = await supabase
+        .from('assignees')
+        .select('notes')
+        .eq('id', personId)
+        .eq('workspace_id', workspaceId)
+        .is('user_id', null)
+        .single();
+
+      if (loadError) throw loadError;
+
+      setNotesDraft(data?.notes ?? '');
+      setNotesPersonId(personId);
+    } catch (err) {
+      setNotesError(
+        err instanceof Error ? err.message : 'Unable to load notes'
+      );
+    } finally {
+      setNotesBusy(false);
+    }
+  }
+
+  async function saveNotes() {
+    if (!isAdmin || !notesPersonId || !workspaceId || notesBusy) return;
+
+    setNotesBusy(true);
+    setNotesError('');
+
+    try {
+      const { data, error: saveError } = await supabase
+        .from('assignees')
+        .update({ notes: notesDraft })
+        .eq('id', notesPersonId)
+        .eq('workspace_id', workspaceId)
+        .is('user_id', null)
+        .select('id');
+
+      if (saveError) throw saveError;
+      if (!data?.length) {
+        throw new Error('Notes could not be saved. Check permissions.');
+      }
+
+      setNotesPersonId(null);
+      setNotesDraft('');
+    } catch (err) {
+      setNotesError(
+        err instanceof Error ? err.message : 'Unable to save notes'
+      );
+    } finally {
+      setNotesBusy(false);
     }
   }
 
@@ -151,6 +220,12 @@ export const PlanningGroupResources: React.FC<Props> = ({
         </div>
       )}
 
+      {notesError && (
+        <p role="alert" className="text-sm text-destructive">
+          {notesError}
+        </p>
+      )}
+
       {assigned.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No planning resources in this group.
@@ -160,9 +235,21 @@ export const PlanningGroupResources: React.FC<Props> = ({
           {assigned.map(person => (
             <div
               key={person.id}
-              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+              className="rounded-lg border px-3 py-2"
             >
-              <div className="min-w-0">
+              <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="min-w-0 flex-1 cursor-pointer text-left"
+                title="Double-click to view or edit notes"
+                disabled={notesBusy}
+                onDoubleClick={() => void openNotes(person.id)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    void openNotes(person.id);
+                  }
+                }}
+              >
                 <div className="truncate text-sm font-semibold">
                   {person.name}
                 </div>
@@ -170,7 +257,7 @@ export const PlanningGroupResources: React.FC<Props> = ({
                   {person.phone || person.email || 'Planning-only resource'}
                   {!person.isActive ? ' · Disabled' : ''}
                 </div>
-              </div>
+              </button>
 
               {isAdmin && (
                 <Button
@@ -181,6 +268,51 @@ export const PlanningGroupResources: React.FC<Props> = ({
                 >
                   Remove
                 </Button>
+              )}
+              </div>
+
+              {notesPersonId === person.id && (
+                <div className="mt-3 space-y-3 border-t pt-3">
+                  <label
+                    htmlFor={`notes-${person.id}`}
+                    className="text-sm font-semibold"
+                  >
+                    Notes for {person.name}
+                  </label>
+                  <textarea
+                    id={`notes-${person.id}`}
+                    className="w-full rounded-md border bg-background p-3 text-sm"
+                    rows={5}
+                    placeholder="Skills, qualifications, availability, project experience..."
+                    value={notesDraft}
+                    disabled={!isAdmin || notesBusy}
+                    onChange={event => setNotesDraft(event.target.value)}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={notesBusy}
+                      onClick={() => {
+                        setNotesPersonId(null);
+                        setNotesError('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    {isAdmin && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={notesBusy}
+                        onClick={() => void saveNotes()}
+                      >
+                        {notesBusy ? 'Saving...' : 'Save notes'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           ))}
