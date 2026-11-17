@@ -983,7 +983,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                 >
                   <button
                     type="button"
-                    className="sticky left-0 z-10 flex-shrink-0 border-r border-b border-border bg-neutral-600 px-3 text-left text-base font-bold text-white hover:bg-neutral-500"
+                    className="sticky left-0 z-10 flex-shrink-0 border-r border-b border-border bg-[#D0D3D4] px-3 text-left text-base font-bold text-[#333333] hover:bg-[#C2C7CA]"
                     style={{ width: resolvedSidebarWidth, height: 36 }}
                     aria-expanded={!item.collapsed}
                     onClick={() => toggleTeamGroup(item.id)}
@@ -997,7 +997,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                     </span>
                   </button>
                   <div
-                    className="flex-shrink-0 border-b border-neutral-500 bg-neutral-600"
+                    className="flex-shrink-0 border-b border-[#AEB4B7] bg-[#D0D3D4]"
                     style={{ width: totalWidth, height: 36 }}
                   />
                 </div>
