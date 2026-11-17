@@ -49,56 +49,10 @@ const TimelineHeaderBase: React.FC<TimelineHeaderProps> = ({
 
   const totalWidth = visibleDays.length * dayWidth;
 
-  // Consecutive date columns belonging to each calendar month.
-  // These use exactly the same dayWidth as the existing date cells.
-  const monthSegments = React.useMemo(() => {
-    const segments: Array<{
-      key: string;
-      label: string;
-      count: number;
-    }> = [];
-
-    visibleDays.forEach(day => {
-      const key = format(day, 'yyyy-MM');
-      const previous = segments[segments.length - 1];
-
-      if (previous?.key === key) {
-        previous.count += 1;
-      } else {
-        segments.push({
-          key,
-          label: format(day, 'MMMM yyyy', { locale: dateLocale }),
-          count: 1,
-        });
-      }
-    });
-
-    return segments;
-  }, [visibleDays, dateLocale]);
 
   return (
     <div className="relative select-none" style={{ width: totalWidth }}>
-      {/* Month labels share the existing header height so timeline
-          rows and milestone geometry do not move. */}
-      <div
-        className="pointer-events-none absolute left-0 top-0 z-20 flex h-4"
-        style={{ width: totalWidth }}
-      >
-        {monthSegments.map(segment => (
-          <div
-            key={segment.key}
-            className="flex-shrink-0 overflow-hidden border-r border-border/50 bg-background/90 px-1 text-center"
-            style={{ width: segment.count * dayWidth }}
-            title={segment.label}
-          >
-            <span className="block truncate text-[11px] font-bold leading-4 text-foreground">
-              {segment.label}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Existing day row, with space reserved for month labels. */}
+      {/* Day row */}
       <div className="flex h-14">
         {visibleDays.map((day, index) => {
           const { day: dayName, date } = formatDayHeader(day, viewMode, dateLocale, locale);
@@ -118,7 +72,7 @@ const TimelineHeaderBase: React.FC<TimelineHeaderProps> = ({
                 <div
                   data-day-key={dayKey}
                   className={cn(
-                    'relative flex flex-col items-center justify-center border-r border-border pt-4 pb-0 gap-0.5',
+                    'relative flex flex-col items-center justify-center border-r border-border py-2 gap-1',
                     weekend && 'bg-timeline-weekend',
                     adjacentWeekend && 'border-r-foreground/20',
                     isHoliday && 'holiday-hatch',
