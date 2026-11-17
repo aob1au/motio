@@ -87,7 +87,7 @@ const TimelineHeaderBase: React.FC<TimelineHeaderProps> = ({
           {monthSegments.map(segment => (
             <div
               key={segment.key}
-              className="flex h-10 flex-shrink-0 items-center justify-center overflow-hidden border-r border-border bg-timeline-header"
+              className="flex h-10 flex-shrink-0 items-center justify-center overflow-hidden border-r-2 border-black bg-timeline-header"
               style={{ width: segment.days * dayWidth }}
               title={segment.label}
             >
