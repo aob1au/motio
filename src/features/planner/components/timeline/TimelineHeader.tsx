@@ -36,6 +36,7 @@ const TimelineHeaderBase: React.FC<TimelineHeaderProps> = ({
   onColumnResizeStart,
   onColumnResizeReset,
   viewMode,
+  isMobile = false,
   attentionDate,
   todayKey,
   holidayDates,
@@ -49,10 +50,54 @@ const TimelineHeaderBase: React.FC<TimelineHeaderProps> = ({
 
   const totalWidth = visibleDays.length * dayWidth;
 
+  // Match each month segment precisely to its date columns.
+  const monthSegments = React.useMemo(() => {
+    const segments: Array<{
+      key: string;
+      label: string;
+      days: number;
+    }> = [];
+
+    visibleDays.forEach(day => {
+      const key = format(day, 'yyyy-MM');
+      const last = segments[segments.length - 1];
+
+      if (last?.key === key) {
+        last.days += 1;
+      } else {
+        segments.push({
+          key,
+          label: format(day, 'MMMM yyyy', { locale: dateLocale }),
+          days: 1,
+        });
+      }
+    });
+
+    return segments;
+  }, [visibleDays, dateLocale]);
+
+
 
   return (
     <div className="relative select-none" style={{ width: totalWidth }}>
       {/* Day row */}
+      {/* Month headings occupy the existing 40px desktop header strip. */}
+      {!isMobile && (
+        <div className="flex h-10 border-b border-border">
+          {monthSegments.map(segment => (
+            <div
+              key={segment.key}
+              className="flex h-10 flex-shrink-0 items-center justify-center overflow-hidden border-r border-border bg-timeline-header"
+              style={{ width: segment.days * dayWidth }}
+              title={segment.label}
+            >
+              <span className="truncate px-2 text-xl font-semibold text-foreground">
+                {segment.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex h-14">
         {visibleDays.map((day, index) => {
           const { day: dayName, date } = formatDayHeader(day, viewMode, dateLocale, locale);
