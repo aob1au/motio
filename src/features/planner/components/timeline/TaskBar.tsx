@@ -110,12 +110,14 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
 
   const project = projects.find(p => p.id === task.projectId);
   const status = statuses.find(s => s.id === task.statusId);
-  // Show the resource assigned to this particular timeline row.
-  // On project rows, use the first assigned resource.
-  const displayedResourceId = rowAssigneeId ?? task.assigneeIds?.[0];
-  const displayedResourceName = displayedResourceId
-    ? assignees.find(person => person.id === displayedResourceId)?.name
-    : undefined;
+  // People view: show the person whose row contains the task.
+  // Projects view: show every assigned person, not just the first.
+  const displayedResourceNames = rowAssigneeId
+    ? assignees.find(person => person.id === rowAssigneeId)?.name ?? ''
+    : task.assigneeIds
+        .map(id => assignees.find(person => person.id === id)?.name)
+        .filter((name): name is string => Boolean(name))
+        .join(', ');
 
   const priorityLabels: Record<TaskPriority, string> = {
     low: t`Low priority`,
@@ -258,9 +260,9 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
                     {titleParts[2]}
                   </>
                 ) : task.title}
-                {displayedResourceName && (
+                {displayedResourceNames && (
                   <span className="font-normal">
-                    {' — '}{displayedResourceName}
+                    {' — '}{displayedResourceNames}
                   </span>
                 )}
               </span>
