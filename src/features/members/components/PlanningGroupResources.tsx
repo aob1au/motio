@@ -10,11 +10,22 @@ type Props = {
   isAdmin: boolean;
 };
 
+type Draft = {
+  name: string;
+  email: string;
+  phone: string;
+  groupId: string;
+  isActive: boolean;
+  color: string;
+  notes: string;
+};
+
 export const PlanningGroupResources: React.FC<Props> = ({
   groupId,
   isAdmin,
 }) => {
   const assignees = usePlannerStore(state => state.assignees);
+  const memberGroups = usePlannerStore(state => state.memberGroups);
   const refreshAssignees = usePlannerStore(
     state => state.refreshAssignees
   );
@@ -26,10 +37,8 @@ export const PlanningGroupResources: React.FC<Props> = ({
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [notesPersonId, setNotesPersonId] = useState<string | null>(null);
-  const [notesDraft, setNotesDraft] = useState('');
-  const [notesBusy, setNotesBusy] = useState(false);
-  const [notesError, setNotesError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   const planningResources = useMemo(
     () => assignees.filter(person => !person.userId),
@@ -55,6 +64,115 @@ export const PlanningGroupResources: React.FC<Props> = ({
     [planningResources, groupId, search]
   );
 
+  function closeEditor() {
+    setEditingId(null);
+    setDraft(null);
+    setError('');
+  }
+
+  async function openEditor(person: typeof planningResources[number]) {
+    if (saving) return;
+    if (editingId === person.id) {
+      closeEditor();
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const { data, error: loadError } = await supabase
+        .from('assignees')
+        .select('notes')
+        .eq('id', person.id)
+        .eq('workspace_id', workspaceId!)
+        .is('user_id', null)
+        .single();
+
+      if (loadError) throw loadError;
+
+      setDraft({
+        name: person.name,
+        email: person.email ?? '',
+        phone: person.phone ?? '',
+        groupId: person.groupId ?? '',
+        isActive: person.isActive,
+        color: person.color ?? '',
+        notes: data?.notes ?? '',
+      });
+      setEditingId(person.id);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to open profile'
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveProfile() {
+    if (!isAdmin || !workspaceId || !editingId || !draft || saving) {
+      return;
+    }
+
+    if (!draft.name.trim()) {
+      setError('Name is required.');
+      return;
+    }
+
+    const color = draft.color.trim();
+    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) {
+      setError('Colour must be a six-digit hex code, such as #4F86C6.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const original = planningResources.find(
+        person => person.id === editingId
+      );
+
+      const update = {
+        name: draft.name.trim(),
+        email: draft.email.trim() || null,
+        phone: draft.phone.trim() || null,
+        group_id: draft.groupId || null,
+        is_active: draft.isActive,
+        color: color || null,
+        notes: draft.notes,
+        deactivated_at: draft.isActive
+          ? null
+          : original?.isActive
+            ? new Date().toISOString()
+            : undefined,
+      };
+
+      const { data, error: updateError } = await supabase
+        .from('assignees')
+        .update(update)
+        .eq('id', editingId)
+        .eq('workspace_id', workspaceId)
+        .is('user_id', null)
+        .select('id');
+
+      if (updateError) throw updateError;
+      if (!data?.length) {
+        throw new Error('Profile was not updated. Check permissions.');
+      }
+
+      await refreshAssignees();
+      closeEditor();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to save profile'
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function changeGroup(
     resourceId: string,
     nextGroupId: string | null
@@ -75,87 +193,24 @@ export const PlanningGroupResources: React.FC<Props> = ({
 
       if (updateError) throw updateError;
       if (!data?.length) {
-        throw new Error(
-          'Resource was not updated. Check workspace permissions.'
-        );
+        throw new Error('Resource was not updated.');
       }
 
       await refreshAssignees();
       setAdding(false);
       setSearch('');
+      if (editingId === resourceId) closeEditor();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to update resource'
+        err instanceof Error ? err.message : 'Unable to change group'
       );
     } finally {
       setSaving(false);
     }
   }
 
-  async function openNotes(personId: string) {
-    if (notesBusy || !workspaceId) return;
-
-    if (notesPersonId === personId) {
-      setNotesPersonId(null);
-      setNotesError('');
-      return;
-    }
-
-    setNotesBusy(true);
-    setNotesError('');
-
-    try {
-      const { data, error: loadError } = await supabase
-        .from('assignees')
-        .select('notes')
-        .eq('id', personId)
-        .eq('workspace_id', workspaceId)
-        .is('user_id', null)
-        .single();
-
-      if (loadError) throw loadError;
-
-      setNotesDraft(data?.notes ?? '');
-      setNotesPersonId(personId);
-    } catch (err) {
-      setNotesError(
-        err instanceof Error ? err.message : 'Unable to load notes'
-      );
-    } finally {
-      setNotesBusy(false);
-    }
-  }
-
-  async function saveNotes() {
-    if (!isAdmin || !notesPersonId || !workspaceId || notesBusy) return;
-
-    setNotesBusy(true);
-    setNotesError('');
-
-    try {
-      const { data, error: saveError } = await supabase
-        .from('assignees')
-        .update({ notes: notesDraft })
-        .eq('id', notesPersonId)
-        .eq('workspace_id', workspaceId)
-        .is('user_id', null)
-        .select('id');
-
-      if (saveError) throw saveError;
-      if (!data?.length) {
-        throw new Error('Notes could not be saved. Check permissions.');
-      }
-
-      setNotesPersonId(null);
-      setNotesDraft('');
-    } catch (err) {
-      setNotesError(
-        err instanceof Error ? err.message : 'Unable to save notes'
-      );
-    } finally {
-      setNotesBusy(false);
-    }
-  }
+  const fieldClass =
+    'w-full rounded-md border border-input bg-background px-3 py-2 text-sm';
 
   return (
     <section className="mt-5 space-y-3 border-t border-border pt-4">
@@ -165,7 +220,7 @@ export const PlanningGroupResources: React.FC<Props> = ({
             Planning resources ({assigned.length})
           </h3>
           <p className="text-xs text-muted-foreground">
-            People without login accounts
+            Click a person to view or edit their details
           </p>
         </div>
 
@@ -220,12 +275,6 @@ export const PlanningGroupResources: React.FC<Props> = ({
         </div>
       )}
 
-      {notesError && (
-        <p role="alert" className="text-sm text-destructive">
-          {notesError}
-        </p>
-      )}
-
       {assigned.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No planning resources in this group.
@@ -238,77 +287,150 @@ export const PlanningGroupResources: React.FC<Props> = ({
               className="rounded-lg border px-3 py-2"
             >
               <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                className="min-w-0 flex-1 cursor-pointer text-left"
-                title="Double-click to view or edit notes"
-                disabled={notesBusy}
-                onDoubleClick={() => void openNotes(person.id)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter') {
-                    void openNotes(person.id);
-                  }
-                }}
-              >
-                <div className="truncate text-sm font-semibold">
-                  {person.name}
-                </div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {person.phone || person.email || 'Planning-only resource'}
-                  {!person.isActive ? ' · Disabled' : ''}
-                </div>
-              </button>
-
-              {isAdmin && (
-                <Button
-                  size="sm"
-                  variant="ghost"
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 cursor-pointer text-left"
                   disabled={saving}
-                  onClick={() => void changeGroup(person.id, null)}
+                  aria-expanded={editingId === person.id}
+                  onClick={() => void openEditor(person)}
                 >
-                  Remove
-                </Button>
-              )}
+                  <div className="truncate text-sm font-semibold">
+                    {person.name}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {person.phone || person.email || 'Planning-only resource'}
+                    {!person.isActive ? ' · Disabled' : ''}
+                  </div>
+                </button>
+
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={saving}
+                    onClick={() => void changeGroup(person.id, null)}
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
 
-              {notesPersonId === person.id && (
+              {editingId === person.id && draft && (
                 <div className="mt-3 space-y-3 border-t pt-3">
-                  <label
-                    htmlFor={`notes-${person.id}`}
-                    className="text-sm font-semibold"
-                  >
-                    Notes for {person.name}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="space-y-1 sm:col-span-2">
+                      <span className="text-xs font-medium">Name</span>
+                      <Input
+                        value={draft.name}
+                        disabled={!isAdmin || saving}
+                        onChange={event => setDraft({
+                          ...draft, name: event.target.value
+                        })}
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium">Email</span>
+                      <Input
+                        type="email"
+                        value={draft.email}
+                        disabled={!isAdmin || saving}
+                        onChange={event => setDraft({
+                          ...draft, email: event.target.value
+                        })}
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium">Phone</span>
+                      <Input
+                        value={draft.phone}
+                        disabled={!isAdmin || saving}
+                        onChange={event => setDraft({
+                          ...draft, phone: event.target.value
+                        })}
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium">Group</span>
+                      <select
+                        className={fieldClass}
+                        value={draft.groupId}
+                        disabled={!isAdmin || saving}
+                        onChange={event => setDraft({
+                          ...draft, groupId: event.target.value
+                        })}
+                      >
+                        <option value="">No group</option>
+                        {memberGroups.map(group => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium">
+                        Colour (hex)
+                      </span>
+                      <Input
+                        placeholder="Automatic"
+                        value={draft.color}
+                        disabled={!isAdmin || saving}
+                        onChange={event => setDraft({
+                          ...draft, color: event.target.value
+                        })}
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-2 sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={draft.isActive}
+                        disabled={!isAdmin || saving}
+                        onChange={event => setDraft({
+                          ...draft, isActive: event.target.checked
+                        })}
+                      />
+                      <span className="text-sm">Active resource</span>
+                    </label>
+                  </div>
+
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium">Notes</span>
+                    <textarea
+                      className={fieldClass}
+                      rows={5}
+                      placeholder="Skills, qualifications, availability, project experience..."
+                      value={draft.notes}
+                      disabled={!isAdmin || saving}
+                      onChange={event => setDraft({
+                        ...draft, notes: event.target.value
+                      })}
+                    />
                   </label>
-                  <textarea
-                    id={`notes-${person.id}`}
-                    className="w-full rounded-md border bg-background p-3 text-sm"
-                    rows={5}
-                    placeholder="Skills, qualifications, availability, project experience..."
-                    value={notesDraft}
-                    disabled={!isAdmin || notesBusy}
-                    onChange={event => setNotesDraft(event.target.value)}
-                  />
+
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
-                      disabled={notesBusy}
-                      onClick={() => {
-                        setNotesPersonId(null);
-                        setNotesError('');
-                      }}
+                      variant="outline"
+                      disabled={saving}
+                      onClick={closeEditor}
                     >
-                      Cancel
+                      Close
                     </Button>
+
                     {isAdmin && (
                       <Button
                         type="button"
                         size="sm"
-                        disabled={notesBusy}
-                        onClick={() => void saveNotes()}
+                        disabled={saving || !draft.name.trim()}
+                        onClick={() => void saveProfile()}
                       >
-                        {notesBusy ? 'Saving...' : 'Save notes'}
+                        {saving ? 'Saving...' : 'Save changes'}
                       </Button>
                     )}
                   </div>
