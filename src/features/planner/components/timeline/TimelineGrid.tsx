@@ -87,6 +87,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   const timeOffDragPreview = usePlannerStore((state) => state.timeOffDragPreview ?? null);
   const projects = usePlannerStore((state) => state.projects);
   const assignees = usePlannerStore((state) => state.assignees);
+  const memberGroups = usePlannerStore((state) => state.memberGroups);
   const memberGroupAssignments = usePlannerStore((state) => state.memberGroupAssignments);
   const viewMode = usePlannerStore((state) => state.viewMode);
   const groupMode = usePlannerStore((state) => state.groupMode);
@@ -129,6 +130,49 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   );
 
   const [editingTimeOffId, setEditingTimeOffId] = useState<string | null>(null);
+
+  const [groupByTeam, setGroupByTeam] = useState(() => {
+    try {
+      return window.localStorage.getItem('motio-team-group-by-v1') === 'team';
+    } catch {
+      return false;
+    }
+  });
+
+  const [collapsedTeamGroups, setCollapsedTeamGroups] =
+    useState<Record<string, boolean>>(() => {
+      try {
+        const value: unknown = JSON.parse(
+          window.localStorage.getItem('motio-team-collapsed-v1') || '{}'
+        );
+        return value && typeof value === 'object' && !Array.isArray(value)
+          ? value as Record<string, boolean>
+          : {};
+      } catch {
+        return {};
+      }
+    });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'motio-team-group-by-v1', groupByTeam ? 'team' : 'none'
+      );
+    } catch {
+      // Storage unavailable.
+    }
+  }, [groupByTeam]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'motio-team-collapsed-v1',
+        JSON.stringify(collapsedTeamGroups)
+      );
+    } catch {
+      // Storage unavailable.
+    }
+  }, [collapsedTeamGroups]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sidebarContainerRef = useRef<HTMLDivElement>(null);
@@ -569,6 +613,107 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     });
   }, [displayRows, groupMode, workspaceRowHeights, rowContentMinHeight]);
 
+  // Group existing display rows without changing their task geometry.
+  type TimelineItem =
+    | {
+        kind: 'heading';
+        id: string;
+        name: string;
+        count: number;
+        collapsed: boolean;
+      }
+    | {
+        kind: 'resource';
+        row: typeof adjustedDisplayRows[number];
+        rowIndex: number;
+      };
+
+  const groupingEnabled = groupMode === 'assignee' && groupByTeam;
+
+  const timelineItems = useMemo<TimelineItem[]>(() => {
+    const flat: TimelineItem[] = adjustedDisplayRows.map(
+      (row, rowIndex) => ({ kind: 'resource', row, rowIndex })
+    );
+
+    if (!groupingEnabled) return flat;
+
+    const knownGroups = new Map(
+      memberGroups.map(group => [group.id, group.name])
+    );
+
+    const grouped = new Map<
+      string,
+      {
+        name: string;
+        rows: Array<{
+          row: typeof adjustedDisplayRows[number];
+          rowIndex: number;
+        }>;
+      }
+    >();
+
+    adjustedDisplayRows.forEach((row, rowIndex) => {
+      const assignedId = assigneeGroupMap.get(row.id);
+      const id = assignedId && knownGroups.has(assignedId)
+        ? assignedId
+        : '__unassigned__';
+
+      const name = id === '__unassigned__'
+        ? 'Unassigned'
+        : knownGroups.get(id)!;
+
+      if (!grouped.has(id)) {
+        grouped.set(id, { name, rows: [] });
+      }
+
+      grouped.get(id)!.rows.push({ row, rowIndex });
+    });
+
+    const ordered = Array.from(grouped.entries()).sort(
+      ([a, ga], [b, gb]) =>
+        a === '__unassigned__'
+          ? 1
+          : b === '__unassigned__'
+            ? -1
+            : ga.name.localeCompare(gb.name)
+    );
+
+    const output: TimelineItem[] = [];
+
+    ordered.forEach(([id, group]) => {
+      const key = `${currentWorkspaceId ?? 'default'}:${id}`;
+      const collapsed = Boolean(collapsedTeamGroups[key]);
+
+      output.push({
+        kind: 'heading',
+        id,
+        name: group.name,
+        count: group.rows.length,
+        collapsed,
+      });
+
+      if (!collapsed) {
+        group.rows.forEach(({ row, rowIndex }) => {
+          output.push({ kind: 'resource', row, rowIndex });
+        });
+      }
+    });
+
+    return output;
+  }, [
+    adjustedDisplayRows, groupingEnabled, memberGroups,
+    assigneeGroupMap, currentWorkspaceId, collapsedTeamGroups,
+  ]);
+
+  const toggleTeamGroup = useCallback((id: string) => {
+    const key = `${currentWorkspaceId ?? 'default'}:${id}`;
+
+    setCollapsedTeamGroups(previous => ({
+      ...previous,
+      [key]: !previous[key],
+    }));
+  }, [currentWorkspaceId]);
+
   const setResourceRowHeight = useCallback((
     rowId: string,
     height: number | null,
@@ -725,6 +870,25 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
           }}
         />
       ))}
+      {groupMode === 'assignee' && (
+        <div className="flex flex-shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2">
+          <label
+            htmlFor="motio-timeline-group-by"
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Group by
+          </label>
+          <select
+            id="motio-timeline-group-by"
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+            value={groupByTeam ? 'team' : 'none'}
+            onChange={event => setGroupByTeam(event.target.value === 'team')}
+          >
+            <option value="none">None</option>
+            <option value="team">Team group</option>
+          </select>
+        </div>
+      )}
       <TimelineDragScrollContext.Provider value={dragScrollController}>
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div
@@ -810,7 +974,39 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
             </div>
 
             {/* Timeline rows */}
-            {adjustedDisplayRows.map((row, rowIndex) => (
+            {timelineItems.map((item) => {
+              if (item.kind === 'heading') return (
+                <div
+                  key={`team-${item.id}`}
+                  className="flex"
+                  data-testid={`timeline-team-${item.id}`}
+                >
+                  <button
+                    type="button"
+                    className="sticky left-0 z-10 flex-shrink-0 border-r border-b border-border bg-muted px-3 text-left text-xs font-semibold hover:bg-accent"
+                    style={{ width: resolvedSidebarWidth, height: 36 }}
+                    aria-expanded={!item.collapsed}
+                    onClick={() => toggleTeamGroup(item.id)}
+                    title={item.collapsed ? 'Expand team' : 'Collapse team'}
+                  >
+                    <span className="mr-2">
+                      {item.collapsed ? '▸' : '▾'}
+                    </span>
+                    <span className="truncate">
+                      {item.name} ({item.count})
+                    </span>
+                  </button>
+                  <div
+                    className="flex-shrink-0 border-b border-border bg-muted/50"
+                    style={{ width: totalWidth, height: 36 }}
+                  />
+                </div>
+              );
+
+              const row = item.row;
+              const rowIndex = item.rowIndex;
+
+              return (
               <div
                 key={row.id}
                 className="flex"
@@ -860,7 +1056,8 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                   </TimelineRow>
                 </div>
               </div>
-            ))}
+              );
+            })}
 
             {/* While searching, room under the last row so a match there can be
                 scrolled up to the middle instead of sitting cut off at the edge. */}
