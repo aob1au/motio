@@ -89,7 +89,7 @@ export const MemberGroupDialogs: React.FC<MemberGroupDialogsProps> = ({ flow, gr
         <AlertDialogHeader>
           <AlertDialogTitle>{t`Delete group?`}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t`"${groupDeleteTarget?.name ?? ''}" disappears from the workspace. The people in it stay, just without a group.`}
+            {`Are you sure you want to delete "${groupDeleteTarget?.name ?? ''}"? Only empty groups can be deleted. People, projects and tasks will not be deleted.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

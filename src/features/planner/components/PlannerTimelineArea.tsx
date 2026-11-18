@@ -1,3 +1,4 @@
+import { TimelineExportDialog } from '@/features/planner/components/timeline/TimelineExportDialog';
 import React, { Suspense } from 'react';
 import { t } from '@lingui/macro';
 import { TimelineGrid } from '@/features/planner/components/timeline/TimelineGrid';
@@ -44,6 +45,12 @@ export const PlannerTimelineArea = React.memo(({
 }: PlannerTimelineAreaProps) => (
   <div className="flex-1 flex flex-col overflow-hidden min-h-0 timeline-surface">
     <TimelineControls />
+    {surface === 'timeline' && viewMode !== 'calendar' && (
+      <div className="flex justify-end border-b px-3 py-1.5">
+        <TimelineExportDialog />
+      </div>
+    )}
+
     {surface === 'timeline' && viewMode !== 'calendar' && <TimelineSearchStrip />}
     <div className="relative flex-1 overflow-hidden min-h-0">
       {surface === 'board' && (

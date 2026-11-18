@@ -69,8 +69,15 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
       end: milestoneRangeEnd,
     }))
     .sort((a, b) => {
-      if (a.date === b.date) return a.title.localeCompare(b.title, locale);
-      return a.date.localeCompare(b.date);
+      const projectA = projectNameById.get(a.projectId) ?? '';
+      const projectB = projectNameById.get(b.projectId) ?? '';
+
+      return (
+        projectA.localeCompare(projectB, locale) ||
+        a.projectId.localeCompare(b.projectId) ||
+        a.date.localeCompare(b.date) ||
+        a.title.localeCompare(b.title, locale)
+      );
     });
   const milestoneListViewportRef = React.useRef<HTMLDivElement | null>(null);
   const milestoneMeasureRefs = React.useRef(new Map<string, HTMLDivElement>());
@@ -153,20 +160,32 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
       {milestonesInRange.length ? (
         <div ref={milestoneListViewportRef} className="relative flex-1 min-h-0 overflow-hidden">
           <div className="space-y-2 text-xs">
-            {visibleMilestones.map((milestone) => {
+            {visibleMilestones.map((milestone, index) => {
               const projectName = projectNameById.get(milestone.projectId);
+              const startsProject =
+                index === 0 ||
+                visibleMilestones[index - 1].projectId !== milestone.projectId;
+
               return (
-                <div key={milestone.id} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 break-words text-sm font-medium text-foreground">
-                      {milestone.title}
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">
+                <div
+                  key={milestone.id}
+                  className="min-w-0"
+                >
+                  {startsProject && (
+                    <div className={cn(
+                      'mb-1 break-words text-base font-bold text-foreground',
+                      index > 0 && 'border-t border-border pt-3 mt-2'
+                    )}>
                       {projectName ?? t`No project`}
                     </div>
-                  </div>
-                  <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                    {format(parseISO(milestone.date), 'MMM d', { locale: dateLocale })}
+                  )}
+                  <div className="flex items-start justify-between gap-2 pl-1">
+                    <div className="min-w-0 flex-1 break-words text-sm font-normal text-foreground">
+                      {milestone.title}
+                    </div>
+                    <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                      {format(parseISO(milestone.date), 'd MMM', { locale: dateLocale })}
+                    </div>
                   </div>
                 </div>
               );
@@ -186,9 +205,14 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
                     <div className="grid gap-1">
                       {hiddenMilestones.map((milestone) => (
                         <div key={milestone.id} className="flex items-center justify-between gap-3">
-                          <span className="truncate">{milestone.title}</span>
+                          <span className="min-w-0 break-words">
+                            <span className="font-semibold">
+                              {projectNameById.get(milestone.projectId) ?? t`No project`}
+                            </span>
+                            {' - '}{milestone.title}
+                          </span>
                           <span className="text-muted-foreground">
-                            {format(parseISO(milestone.date), 'MMM d', { locale: dateLocale })}
+                            {format(parseISO(milestone.date), 'd MMM', { locale: dateLocale })}
                           </span>
                         </div>
                       ))}
@@ -200,28 +224,37 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
           </div>
           <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 opacity-0">
             <div className="space-y-2 text-xs">
-              {milestonesInRange.map((milestone) => {
-                const projectName = projectNameById.get(milestone.projectId);
-                return (
-                  <div
-                    key={`measure-${milestone.id}`}
-                    ref={setMilestoneMeasureRef(milestone.id)}
-                    className="flex items-start justify-between gap-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="line-clamp-2 break-words text-sm font-medium text-foreground">
-                        {milestone.title}
-                      </div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {projectName ?? t`No project`}
-                      </div>
+              {milestonesInRange.map((milestone, index) => {
+              const projectName = projectNameById.get(milestone.projectId);
+              const startsProject =
+                index === 0 ||
+                milestonesInRange[index - 1].projectId !== milestone.projectId;
+
+              return (
+                <div
+                  key={`measure-${milestone.id}`}
+                  ref={setMilestoneMeasureRef(milestone.id)}
+                  className="min-w-0"
+                >
+                  {startsProject && (
+                    <div className={cn(
+                      'mb-1 break-words text-base font-bold text-foreground',
+                      index > 0 && 'border-t border-border pt-3 mt-2'
+                    )}>
+                      {projectName ?? t`No project`}
+                    </div>
+                  )}
+                  <div className="flex items-start justify-between gap-2 pl-1">
+                    <div className="min-w-0 flex-1 break-words text-sm font-normal text-foreground">
+                      {milestone.title}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                      {format(parseISO(milestone.date), 'MMM d', { locale: dateLocale })}
+                      {format(parseISO(milestone.date), 'd MMM', { locale: dateLocale })}
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
             </div>
           </div>
         </div>

@@ -306,6 +306,8 @@ const MembersPage = () => {
       onEditingGroupNameChange={setEditingGroupName}
       onCancelEdit={() => { setEditingGroupId(null); setEditingGroupName(''); }}
       onSaveGroupName={handleSaveGroupName}
+      onStartEditGroup={handleStartEditGroup}
+      onDeleteGroup={requestGroupDeletion}
       groupActionLoading={groupActionLoading}
       groupMembers={groupMembers}
       groupMembersLoading={groupMembersLoading}
