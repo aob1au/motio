@@ -270,7 +270,7 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
             {geometry.twoLineBars && (
             <div className="flex items-center gap-1.5 min-w-0">
               <span
-                className="text-[11px] leading-tight truncate"
+                className="text-[13px] font-medium leading-tight truncate"
                 style={{ color: appearance.secondaryTextColor }}
               >
                 {project ? formatProjectLabel(project.name, project.code) : t`No project`}

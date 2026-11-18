@@ -592,11 +592,13 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   }, [geometry, timeOffIndex]);
 
   const adjustedDisplayRows = useMemo(() => {
-    if (groupMode !== 'assignee') return displayRows;
+    if (groupMode !== 'assignee' && groupMode !== 'project') return displayRows;
 
     return displayRows.map(row => {
       if (row.id === 'unassigned') return row;
-      const override = workspaceRowHeights[row.id];
+      const storageRowId =
+        groupMode === 'project' ? `project:${row.id}` : row.id;
+      const override = workspaceRowHeights[storageRowId];
       if (typeof override !== 'number' || !Number.isFinite(override)) {
         return {
           ...row,
@@ -718,21 +720,24 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     rowId: string,
     height: number | null,
   ) => {
+    const storageRowId =
+      groupMode === 'project' ? `project:${rowId}` : rowId;
+
     setSavedRowHeights(previous => {
       const updated = {
         ...(previous[rowHeightWorkspace] ?? {}),
       };
       if (height === null) {
-        delete updated[rowId];
+        delete updated[storageRowId];
       } else {
-        updated[rowId] = height;
+        updated[storageRowId] = height;
       }
       return {
         ...previous,
         [rowHeightWorkspace]: updated,
       };
     });
-  }, [rowHeightWorkspace]);
+  }, [rowHeightWorkspace, groupMode]);
 
   const handleResourceRowResizeStart = useCallback((
     event: React.PointerEvent<HTMLDivElement>,
@@ -1022,12 +1027,12 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                   getMonogram={getSidebarRowMonogram}
                   getAvatarInfo={getAssigneeAvatarInfo}
                   smallPhotos={!geometry.tieredAvatars}
-                  onResizeStart={groupMode === 'assignee' && !isMobile
+                  onResizeStart={(groupMode === 'assignee' || groupMode === 'project') && !isMobile
                     ? (event, id) => handleResourceRowResizeStart(
                         event, id, row.height, rowContentMinHeight(row)
                       )
                     : undefined}
-                  onResizeReset={groupMode === 'assignee' && !isMobile
+                  onResizeReset={(groupMode === 'assignee' || groupMode === 'project') && !isMobile
                     ? handleResourceRowResizeReset
                     : undefined}
                 />
