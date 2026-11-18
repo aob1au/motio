@@ -406,13 +406,44 @@ export const createWorkspaceActions = (
   deleteMemberGroup: async (workspaceId, groupId) => {
     const currentGroup = get().memberGroups.find((group) => group.id === groupId) ?? null;
 
-    // Clear group_id on affected members before deleting the group (safety net
-    // in case the DB-level ON DELETE SET NULL (group_id) clause is not yet applied).
-    await supabase
-      .from('workspace_members')
-      .update({ group_id: null })
-      .eq('workspace_id', workspaceId)
-      .eq('group_id', groupId);
+    // Only empty groups may be deleted.
+    // Never automatically detach people or projects.
+    const auth = useAuthStore.getState();
+
+    if (auth.currentWorkspaceId !== workspaceId ||
+        auth.currentWorkspaceRole !== 'admin') {
+      return { error: 'Only workspace administrators may delete groups.' };
+    }
+
+    const [memberCheck, resourceCheck, projectCheck] = await Promise.all([
+      supabase
+        .from('workspace_members')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('group_id', groupId),
+      supabase
+        .from('assignees')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('group_id', groupId),
+      supabase
+        .from('projects')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('owner_group_id', groupId),
+    ]);
+
+    const checks = [memberCheck, resourceCheck, projectCheck];
+
+    if (checks.some(check => check.error || check.count === null)) {
+      return { error: 'Unable to verify that this group is empty.' };
+    }
+
+    if (checks.some(check => (check.count ?? 0) > 0)) {
+      return {
+        error: 'Move or remove all members, planning resources and associated projects before deleting this group.',
+      };
+    }
 
     const { error } = await supabase
       .from('member_groups')

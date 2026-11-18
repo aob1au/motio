@@ -38,6 +38,8 @@ interface MembersGroupPanelProps {
   onEditingGroupNameChange: (name: string) => void;
   onCancelEdit: () => void;
   onSaveGroupName: () => void;
+  onStartEditGroup: (group: PlannerGroup) => void;
+  onDeleteGroup: (group: PlannerGroup) => void;
   groupActionLoading: boolean;
   groupMembers: PlannerGroupMember[];
   groupMembersLoading: boolean;
@@ -65,6 +67,8 @@ export const MembersGroupPanel: React.FC<MembersGroupPanelProps> = ({
   onEditingGroupNameChange,
   onCancelEdit,
   onSaveGroupName,
+  onStartEditGroup,
+  onDeleteGroup,
   groupActionLoading,
   groupMembers,
   groupMembersLoading,
@@ -154,6 +158,42 @@ export const MembersGroupPanel: React.FC<MembersGroupPanelProps> = ({
                 {/* The group's name is the screen's title on a phone. */}
                 {!isMobile && (
                   <div className="text-lg font-semibold">{selectedGroup.name}</div>
+                )}
+                {isAdmin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={isMobile ? 'h-11 w-11 p-0' : 'h-9 w-9 p-0'}
+                        disabled={groupActionLoading}
+                        aria-label="Group actions"
+                        title="Group actions"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem
+                        onSelect={() => onStartEditGroup(selectedGroup)}
+                      >
+                        Rename group
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => onDeleteGroup(selectedGroup)}
+                        disabled={
+                          groupActionLoading ||
+                          groupMembersLoading ||
+                          Boolean(groupMembersError) ||
+                          groupMembers.length > 0
+                        }
+                        className="text-destructive focus:text-destructive"
+                      >
+                        Delete group
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
                 {isAdmin && isMobile && (
                   // A popover with its own scroller is unreachable with a
