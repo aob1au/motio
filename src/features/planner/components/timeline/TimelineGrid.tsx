@@ -693,11 +693,14 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
 
 
     if (groupMode === 'project') {
+      const cleanProjectName = (name: unknown) =>
+        String(name ?? '').replace(/^\s*\[[^\]]+\]\s*/, '').trim();
+
       const sorted = adjustedDisplayRows
         .map((row, rowIndex) => ({ row, rowIndex }))
         .sort((a, b) =>
-          String(a.row.name ?? '').localeCompare(
-            String(b.row.name ?? ''),
+          cleanProjectName(a.row.name).localeCompare(
+            cleanProjectName(b.row.name),
             undefined,
             { sensitivity: 'base', numeric: true }
           )
@@ -707,7 +710,11 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
 
       sorted.forEach(({ row, rowIndex }) => {
         if (!groupByProject) {
-          output.push({ kind: 'resource', row, rowIndex });
+          output.push({
+            kind: 'resource',
+            row: { ...row, name: cleanProjectName(row.name) },
+            rowIndex,
+          });
           return;
         }
 
@@ -731,7 +738,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
           kind: 'resource',
           row,
           rowIndex,
-          projectName: String(row.name ?? ''),
+          projectName: cleanProjectName(row.name),
           projectColor: details.color,
           projectCount: count,
           projectCollapsed: collapsed,

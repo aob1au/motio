@@ -63,14 +63,17 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
     format(milestoneRangeEnd, 'yyyy-MM-dd'),
     dateLocale,
   );
+  const cleanProjectName = (name: string | undefined) =>
+    name?.replace(/^\s*\[[^\]]+\]\s*/, '').trim();
+
   const milestonesInRange = milestones
     .filter((milestone) => isWithinInterval(parseISO(milestone.date), {
       start: milestoneRangeStart,
       end: milestoneRangeEnd,
     }))
     .sort((a, b) => {
-      const projectA = projectNameById.get(a.projectId) ?? '';
-      const projectB = projectNameById.get(b.projectId) ?? '';
+      const projectA = cleanProjectName(projectNameById.get(a.projectId)) ?? '';
+      const projectB = cleanProjectName(projectNameById.get(b.projectId)) ?? '';
 
       return (
         projectA.localeCompare(projectB, locale) ||
@@ -161,7 +164,7 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
         <div ref={milestoneListViewportRef} className="relative flex-1 min-h-0 overflow-hidden">
           <div className="space-y-2 text-xs">
             {visibleMilestones.map((milestone, index) => {
-              const projectName = projectNameById.get(milestone.projectId);
+              const projectName = cleanProjectName(projectNameById.get(milestone.projectId));
               const startsProject =
                 index === 0 ||
                 visibleMilestones[index - 1].projectId !== milestone.projectId;
@@ -207,7 +210,7 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
                         <div key={milestone.id} className="flex items-center justify-between gap-3">
                           <span className="min-w-0 break-words">
                             <span className="font-semibold">
-                              {projectNameById.get(milestone.projectId) ?? t`No project`}
+                              {cleanProjectName(projectNameById.get(milestone.projectId)) ?? t`No project`}
                             </span>
                             {' - '}{milestone.title}
                           </span>
@@ -225,7 +228,7 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
           <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 opacity-0">
             <div className="space-y-2 text-xs">
               {milestonesInRange.map((milestone, index) => {
-              const projectName = projectNameById.get(milestone.projectId);
+              const projectName = cleanProjectName(projectNameById.get(milestone.projectId));
               const startsProject =
                 index === 0 ||
                 milestonesInRange[index - 1].projectId !== milestone.projectId;
