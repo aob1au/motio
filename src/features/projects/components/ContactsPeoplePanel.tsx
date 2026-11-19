@@ -1,3 +1,4 @@
+import { EmailLink } from '@/shared/ui/EmailLink';
 import React, { useEffect, useMemo, useState } from 'react';
 import { t } from '@lingui/macro';
 import { Mail, MoreHorizontal, Phone, Plus, SlidersHorizontal } from 'lucide-react';
@@ -362,7 +363,7 @@ export const ContactsPeoplePanel: React.FC<ContactsPeoplePanelProps> = ({
                     )}
                   </button>
                   <div className="hidden items-center gap-3 text-xs text-muted-foreground sm:flex">
-                    {entry.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{entry.email}</span>}
+                    {entry.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /><EmailLink email={entry.email} /></span>}
                     {entry.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{entry.phone}</span>}
                   </div>
                   <DropdownMenu>
