@@ -91,7 +91,7 @@ export interface PlannerStore extends PlannerState {
   fetchMemberGroups: (workspaceId: string) => Promise<{ groups: PlannerGroup[]; error?: string }>;
   fetchGroupMembers: (workspaceId: string, groupId: string) => Promise<{ members: PlannerGroupMember[]; error?: string }>;
   createMemberGroup: (workspaceId: string, name: string) => Promise<{ groupId?: string; error?: string }>;
-  updateMemberGroup: (workspaceId: string, groupId: string, name: string) => Promise<MutationResult>;
+  updateMemberGroup: (workspaceId: string, groupId: string, name: string, color?: string) => Promise<MutationResult>;
   deleteMemberGroup: (workspaceId: string, groupId: string) => Promise<MutationResult>;
   reset: () => void;
   markTimelineInteraction: (durationMs?: number) => void;

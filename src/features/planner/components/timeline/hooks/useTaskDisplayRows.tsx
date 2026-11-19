@@ -278,6 +278,7 @@ export const useTaskDisplayRows = ({
             lane={task.lane}
             canEdit={canEdit}
             rowAssigneeId={rowAssigneeId}
+            colorMode={groupMode === 'project' ? 'project' : 'people'}
             geometry={geometry}
           />,
         );

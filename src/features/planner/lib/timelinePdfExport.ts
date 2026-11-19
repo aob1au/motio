@@ -1,8 +1,9 @@
 import { jsPDF } from 'jspdf';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
-import type { Task, Project, Assignee, Status, Milestone, TimeOff } from '@/features/planner/types/planner';
-import { buildPersonColorMap } from '@/features/planner/lib/timeOffPalette';
+import type { Task, Project, Assignee, Status, Milestone, TimeOff, MemberGroup, MemberGroupAssignment } from '@/features/planner/types/planner';
 import { getTaskBarAppearance } from '@/features/planner/lib/taskBarColors';
+import { resolveTimelineColor } from '@/features/planner/lib/contextualTimelineColors';
+import { buildAssigneeGroupMap } from '@/features/planner/lib/timelineSelectors';
 import { formatProjectLabel } from '@/shared/lib/projectLabels';
 
 export interface ExportRow {
@@ -22,6 +23,8 @@ export interface TimelinePdfOptions {
   projectRows: ExportRow[];
   projects: Project[];
   assignees: Assignee[];
+  memberGroups?: MemberGroup[];
+  memberGroupAssignments?: MemberGroupAssignment[];
   statuses: Status[];
   milestones: Milestone[];
 }
@@ -46,7 +49,10 @@ export function exportTimelinePdf(options: TimelinePdfOptions) {
   });
   const keys = days.map(d => format(d, 'yyyy-MM-dd'));
   const dayWidth = gridWidth / days.length;
-  const personColors = buildPersonColorMap(options.assignees);
+  const assigneeGroupMap = buildAssigneeGroupMap(
+    options.assignees,
+    options.memberGroupAssignments ?? [],
+  );
   const projectMap = new Map(options.projects.map(p => [p.id, p]));
   const personMap = new Map(options.assignees.map(p => [p.id, p]));
   const statusMap = new Map(options.statuses.map(s => [s.id, s]));
@@ -120,6 +126,51 @@ export function exportTimelinePdf(options: TimelinePdfOptions) {
     );
 
     y = 35;
+
+    if (section.startsWith('2')) {
+      const legend = [
+        ...(options.memberGroups ?? []).map(group => ({
+          name: group.name,
+          color: group.color ?? '#D9DDE2',
+        })),
+        { name: 'No group / Mixed groups', color: '#D9DDE2' },
+      ];
+
+      let legendX = margin;
+      let legendY = y;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+
+      for (const item of legend) {
+        const itemWidth = Math.min(
+          W - 2 * margin,
+          pdf.getTextWidth(item.name) + 10,
+        );
+
+        if (legendX + itemWidth > W - margin) {
+          legendX = margin;
+          legendY += 5;
+        }
+
+        rectangle(
+          legendX, legendY, 3, 3,
+          item.color, '#b0b0b0',
+        );
+
+        text(
+          item.name,
+          legendX + 4,
+          legendY + 2.5,
+          itemWidth - 5,
+          7,
+        );
+
+        legendX += itemWidth;
+      }
+
+      y = legendY + 7;
+    }
 
     rectangle(margin, y, sidebar, 16, '#f1f2f3');
 
@@ -306,16 +357,17 @@ export function exportTimelinePdf(options: TimelinePdfOptions) {
 
             const task = bar.task;
             const project = task.projectId ? projectMap.get(task.projectId) : undefined;
-            const colorId = row.assigneeId ?? task.assigneeIds[0];
-            const resourceColor = colorId ? personColors.get(colorId) : undefined;
+            const timelineColor = resolveTimelineColor({
+              mode: row.assigneeId ? 'people' : 'project',
+              projectColor: project?.color,
+              assigneeIds: task.assigneeIds,
+              assigneeGroupMap,
+              memberGroups: options.memberGroups ?? [],
+            });
 
             const appearance = getTaskBarAppearance({
-              fallbackProjectColor:
-                options.projects.length === 1
-                  ? options.projects[0]?.color
-                  : undefined,
               priority: task.priority,
-              projectColor: resourceColor ?? project?.color,
+              projectColor: timelineColor,
               status: statusMap.get(task.statusId),
             });
 
@@ -335,8 +387,8 @@ export function exportTimelinePdf(options: TimelinePdfOptions) {
                 : 'No project'
               : names || 'Unassigned';
 
-            text(task.title, x + 1, top + 3.7, width - 2, 8, true);
-            text(sublabel, x + 1, top + 7.3, width - 2, 7);
+            text(task.title, x + 1, top + 3.7, width - 2, 8, true, appearance.textColor);
+            text(sublabel, x + 1, top + 7.3, width - 2, 7, false, appearance.textColor);
           });
 
         y += height;
@@ -346,40 +398,85 @@ export function exportTimelinePdf(options: TimelinePdfOptions) {
   }
 
   function drawMilestones() {
-    if (options.milestones.length) {
-      const section = '3. Milestones';
-      newPage(section);
+    if (!options.milestones.length) return;
 
-      for (const milestone of [...options.milestones].sort(
-        (a, b) => a.date.localeCompare(b.date)
-      )) {
-        const index = keys.indexOf(milestone.date);
-        if (index < 0) continue;
+    const section = '3. Milestones';
 
-        if (y + 7 > bottom) newPage(section);
+    const milestones = [...options.milestones]
+      .filter(m => keys.includes(m.date))
+      .sort((a, b) =>
+        (projectMap.get(a.projectId)?.name ?? 'No project')
+          .localeCompare(
+            projectMap.get(b.projectId)?.name ?? 'No project'
+          ) ||
+        (a.projectId ?? '').localeCompare(b.projectId ?? '') ||
+        a.date.localeCompare(b.date)
+      );
 
-        gridRow(7);
+    if (!milestones.length) return;
 
-        const project = projectMap.get(milestone.projectId);
-        text(project?.name ?? '', margin + 2, y + 4.5, sidebar - 4, 7);
+    newPage(section);
 
-        const x = gridX + (index + 0.5) * dayWidth;
-        pdf.setFillColor(40, 40, 40);
-        pdf.circle(x, y + 3.5, 1.1, 'F');
+    let lastProjectId: string | undefined;
+    let firstRow = true;
+
+    for (const milestone of milestones) {
+      const index = keys.indexOf(milestone.date);
+      const project = projectMap.get(milestone.projectId);
+      const projectId = milestone.projectId ?? '';
+
+      if (y + 7 > bottom) {
+        newPage(section);
+        firstRow = true;
+      }
+
+      const newGroup =
+        firstRow || projectId !== lastProjectId;
+
+      gridRow(7);
+
+      rectangle(
+        margin, y, sidebar, 7,
+        '#f5f5f5', '#dddddd',
+      );
+
+      if (newGroup) {
+        pdf.setDrawColor(145, 145, 145);
+        pdf.setLineWidth(0.4);
+        pdf.line(margin, y, W - margin, y);
+        pdf.setLineWidth(0.2);
 
         text(
-          milestone.title,
-          x + 2, y + 4.5,
-          W - margin - x - 3, 7,
+          project?.name ?? 'No project',
+          margin + 2, y + 4.5,
+          sidebar - 4, 8, true,
         );
-
-        y += 7;
       }
+
+      const x = gridX + (index + 0.5) * dayWidth;
+
+      pdf.setFillColor(40, 40, 40);
+      pdf.circle(x, y + 3.5, 1.1, 'F');
+
+      text(
+        milestone.title,
+        x + 2, y + 4.5,
+        W - margin - x - 3, 7,
+      );
+
+      lastProjectId = projectId;
+      firstRow = false;
+      y += 7;
     }
+
+    pdf.setDrawColor(145, 145, 145);
+    pdf.setLineWidth(0.4);
+    pdf.line(margin, y, W - margin, y);
+    pdf.setLineWidth(0.2);
   }
 
-  drawSection(options.teamRows, '1. Team Allocation');
-  drawSection(options.projectRows, '2. Project Overview');
+  drawSection(options.teamRows, '1. Allocation by Team');
+  drawSection(options.projectRows, '2. Allocation by Project');
   drawMilestones();
 
   const total = pdf.getNumberOfPages();

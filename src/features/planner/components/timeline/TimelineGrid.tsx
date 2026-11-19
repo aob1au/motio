@@ -1029,7 +1029,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
         </div>
       )}
       {groupMode === 'project' && (
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2">
+        <div className="flex flex-shrink-0 flex-nowrap items-center gap-2 border-b border-border bg-background px-3 py-2">
           <label
             htmlFor="motio-project-group-by"
             className="text-xs font-medium text-muted-foreground"
@@ -1066,6 +1066,30 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
               </button>
             </>
           )}
+        <div
+          aria-label="Team group colour legend"
+          className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-x-3 gap-y-1 pl-4"
+        >
+          {memberGroups.map(group => (
+            <div
+              key={group.id}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <span
+                className="h-3 w-3 shrink-0 rounded-sm border border-black/10"
+                style={{ backgroundColor: group.color ?? '#D9DDE2' }}
+              />
+              <span>{group.name}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              className="h-3 w-3 shrink-0 rounded-sm border border-black/10"
+              style={{ backgroundColor: '#D9DDE2' }}
+            />
+            <span>No group / Mixed groups</span>
+          </div>
+        </div>
         </div>
       )}
       <TimelineDragScrollContext.Provider value={dragScrollController}>

@@ -8,7 +8,8 @@ import { cn } from '@/shared/lib/classNames';
 import { formatProjectLabel } from '@/shared/lib/projectLabels';
 import { NORMAL_TIMELINE_GEOMETRY, type TimelineGeometry } from '@/features/planner/lib/timelineDensity';
 import { getTaskBarAppearance } from '@/features/planner/lib/taskBarColors';
-import { buildPersonColorMap } from '@/features/planner/lib/timeOffPalette';
+import { resolveTimelineColor } from '@/features/planner/lib/contextualTimelineColors';
+import { buildAssigneeGroupMap } from '@/features/planner/lib/timelineSelectors';
 import { Ban, MessageSquare, RotateCw } from 'lucide-react';
 import { t } from '@lingui/macro';
 import { useLocaleStore } from '@/shared/store/localeStore';
@@ -34,6 +35,7 @@ interface TaskBarProps {
   lane: number;
   canEdit: boolean;
   rowAssigneeId?: string | null;
+  colorMode?: 'people' | 'project';
   /** Bar sizes (timeline density); the usual ones when left out. */
   geometry?: TimelineGeometry;
 }
@@ -45,6 +47,7 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
   lane,
   canEdit,
   rowAssigneeId = null,
+  colorMode,
   geometry = NORMAL_TIMELINE_GEOMETRY,
 }) => {
   const locale = useLocaleStore((state) => state.locale);
@@ -56,6 +59,8 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
   const projects = usePlannerStore((state) => state.projects);
   const statuses = usePlannerStore((state) => state.statuses);
   const assignees = usePlannerStore((state) => state.assignees);
+  const memberGroups = usePlannerStore((state) => state.memberGroups);
+  const memberGroupAssignments = usePlannerStore((state) => state.memberGroupAssignments);
   const setSelectedTaskId = usePlannerStore((state) => state.setSelectedTaskId);
   const setPeekedTaskId = usePlannerStore((state) => state.setPeekedTaskId);
   const setHighlightedTaskId = usePlannerStore((state) => state.setHighlightedTaskId);
@@ -126,25 +131,25 @@ const TaskBarBase: React.FC<TaskBarProps> = ({
   };
   const isRepeating = Boolean(task.repeatId);
 
-  const resourceColors = useMemo(
-    () => buildPersonColorMap(assignees),
-    [assignees],
+  const assigneeGroupMap = useMemo(
+    () => buildAssigneeGroupMap(assignees, memberGroupAssignments),
+    [assignees, memberGroupAssignments],
   );
 
-  // Resource rows use their own person; project rows use the first
-  // person assigned to the task.
-  const colourAssigneeId = rowAssigneeId ?? task.assigneeIds[0];
-  const resourceColor = colourAssigneeId
-    ? resourceColors.get(colourAssigneeId)
-    : undefined;
+  const timelineColor = resolveTimelineColor({
+    mode: colorMode ?? (rowAssigneeId ? 'people' : 'project'),
+    projectColor: project?.color,
+    assigneeIds: task.assigneeIds,
+    assigneeGroupMap,
+    memberGroups,
+  });
 
-  const fallbackProjectColor = projects.length === 1 ? projects[0]?.color : undefined;
   const appearance = useMemo(() => getTaskBarAppearance({
-    fallbackProjectColor,
     priority: task.priority,
-    projectColor: resourceColor ?? project?.color,
+    projectColor: timelineColor,
     status,
-  }), [fallbackProjectColor, project?.color, resourceColor, status, task.priority]);
+  }), [timelineColor, status, task.priority]);
+
   const priorityMeta = task.priority && appearance.priorityVisual
     ? { ...appearance.priorityVisual, label: priorityLabels[task.priority] }
     : null;
