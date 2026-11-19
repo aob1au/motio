@@ -14,6 +14,7 @@ import {
   resolveCurrentUserAssigneeId,
 } from '@/features/planner/lib/timelineSelectors';
 import { formatProjectLabel } from '@/shared/lib/projectLabels';
+import { exportTimelinePdf } from '@/features/planner/lib/timelinePdfExport';
 import type { GroupMode } from '@/features/planner/types/planner';
 
 export function TimelineExportDialog() {
