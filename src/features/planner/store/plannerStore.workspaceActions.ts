@@ -216,7 +216,7 @@ export const createWorkspaceActions = (
     const [groupsRes, membersRes] = await Promise.all([
       supabase
         .from('member_groups')
-        .select('id, name')
+        .select('id, name, color')
         .eq('workspace_id', workspaceId)
         .order('name', { ascending: true }),
       supabase
@@ -233,6 +233,7 @@ export const createWorkspaceActions = (
     const memberGroups = (groupsRes.data ?? []).map((row) => ({
       id: (row as { id: string }).id,
       name: (row as { name: string }).name,
+      color: (row as MemberGroupRow).color,
     }));
     const memberGroupAssignments = (membersRes.data ?? []).map((row) => ({
       userId: (row as MemberGroupAssignmentRow).user_id,
@@ -281,7 +282,7 @@ export const createWorkspaceActions = (
   fetchMemberGroups: async (workspaceId) => {
     const { data, error } = await supabase
       .from('member_groups')
-      .select('id, name')
+      .select('id, name, color')
       .eq('workspace_id', workspaceId)
       .order('name', { ascending: true });
 
@@ -293,6 +294,7 @@ export const createWorkspaceActions = (
       groups: (data ?? []).map((row) => ({
         id: (row as MemberGroupRow).id,
         name: (row as MemberGroupRow).name,
+        color: (row as MemberGroupRow).color,
       })),
     };
   },
@@ -361,7 +363,10 @@ export const createWorkspaceActions = (
     return { groupId: (data as { id: string }).id };
   },
 
-  updateMemberGroup: async (workspaceId, groupId, name) => {
+  updateMemberGroup: async (workspaceId, groupId, name, color) => {
+    if (color !== undefined && !/^#[0-9a-f]{6}$/i.test(color)) {
+      return { error: 'Invalid group colour.' };
+    }
     const trimmedName = name.trim();
     if (!trimmedName) {
       return { error: 'Group name is required.' };
@@ -370,7 +375,10 @@ export const createWorkspaceActions = (
 
     const { error } = await supabase
       .from('member_groups')
-      .update({ name: trimmedName })
+      .update({
+        name: trimmedName,
+        ...(color !== undefined ? { color } : {}),
+      })
       .eq('id', groupId)
       .eq('workspace_id', workspaceId);
 

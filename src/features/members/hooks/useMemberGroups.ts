@@ -3,7 +3,7 @@ import { t } from '@lingui/macro';
 import type { WorkspaceRole } from '@/features/auth/store/authStore';
 import { filterAndSortByName } from '@/features/members/lib/memberSelectors';
 
-type MemberGroup = { id: string; name: string };
+type MemberGroup = { id: string; name: string; color?: string };
 
 type GroupMember = {
   userId: string;
@@ -18,7 +18,7 @@ interface UseMemberGroupsInput {
   fetchMemberGroups: (workspaceId: string) => Promise<{ groups: MemberGroup[]; error?: string }>;
   fetchGroupMembers: (workspaceId: string, groupId: string) => Promise<{ members: GroupMember[]; error?: string }>;
   createMemberGroup: (workspaceId: string, name: string) => Promise<{ groupId?: string; error?: string }>;
-  updateMemberGroup: (workspaceId: string, groupId: string, name: string) => Promise<{ error?: string }>;
+  updateMemberGroup: (workspaceId: string, groupId: string, name: string, color?: string) => Promise<{ error?: string }>;
   deleteMemberGroup: (workspaceId: string, groupId: string) => Promise<{ error?: string }>;
   assignMemberToGroup: (userId: string, groupId: string | null) => Promise<{ error?: string }>;
   mode: string;
@@ -49,6 +49,7 @@ export function useMemberGroups({
   const [groupActionLoading, setGroupActionLoading] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editingGroupName, setEditingGroupName] = useState('');
+  const [editingGroupColor, setEditingGroupColor] = useState('#D9DDE2');
 
   const fetchGroups = useCallback(async () => {
     if (!currentWorkspaceId) return;
@@ -151,6 +152,7 @@ export function useMemberGroups({
   const handleStartEditGroup = useCallback((group: MemberGroup) => {
     setEditingGroupId(group.id);
     setEditingGroupName(group.name);
+    setEditingGroupColor(group.color ?? '#D9DDE2');
   }, []);
 
   const handleSaveGroupName = useCallback(async () => {
@@ -159,7 +161,7 @@ export function useMemberGroups({
     if (!trimmedName) return;
     setGroupActionLoading(true);
     setGroupsError('');
-    const result = await updateMemberGroup(currentWorkspaceId, editingGroupId, trimmedName);
+    const result = await updateMemberGroup(currentWorkspaceId, editingGroupId, trimmedName, editingGroupColor);
     if (result.error) {
       setGroupsError(result.error);
       setGroupActionLoading(false);
@@ -169,7 +171,7 @@ export function useMemberGroups({
     setEditingGroupId(null);
     setEditingGroupName('');
     setGroupActionLoading(false);
-  }, [currentWorkspaceId, editingGroupId, editingGroupName, fetchGroups, isAdmin, updateMemberGroup]);
+  }, [currentWorkspaceId, editingGroupId, editingGroupName, editingGroupColor, fetchGroups, isAdmin, updateMemberGroup]);
 
   // Asking happens in the UI (a dialog the app draws), not here: a browser
   // `confirm` blocks the page and looks nothing like the rest of the product.
@@ -244,6 +246,8 @@ export function useMemberGroups({
     setEditingGroupId,
     editingGroupName,
     setEditingGroupName,
+    editingGroupColor,
+    setEditingGroupColor,
     selectedGroup,
     sortedGroups,
     handleCreateGroup,

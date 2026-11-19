@@ -133,6 +133,8 @@ const MembersPage = () => {
     setEditingGroupId,
     editingGroupName,
     setEditingGroupName,
+    editingGroupColor,
+    setEditingGroupColor,
     selectedGroup,
     sortedGroups,
     handleCreateGroup,
@@ -303,6 +305,8 @@ const MembersPage = () => {
       selectedGroupId={selectedGroupId}
       editingGroupId={editingGroupId}
       editingGroupName={editingGroupName}
+      editingGroupColor={editingGroupColor}
+      onEditingGroupColorChange={setEditingGroupColor}
       onEditingGroupNameChange={setEditingGroupName}
       onCancelEdit={() => { setEditingGroupId(null); setEditingGroupName(''); }}
       onSaveGroupName={handleSaveGroupName}

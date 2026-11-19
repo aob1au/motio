@@ -343,6 +343,8 @@ export function TimelineExportDialog() {
         projectRows,
         projects: state.projects,
         assignees: state.assignees,
+        memberGroups: state.memberGroups,
+        memberGroupAssignments: state.memberGroupAssignments,
         statuses: state.statuses,
         milestones,
       });

@@ -205,7 +205,7 @@ export const loadFullWorkspaceData = async (
     .order('created_at', { ascending: false });
   const memberGroupsQuery = supabase
     .from('member_groups')
-    .select('id, name')
+    .select('id, name, color')
     .eq('workspace_id', workspaceId);
   const memberAssignmentsQuery = supabase
     .from('workspace_members')
@@ -342,6 +342,7 @@ export const loadFullWorkspaceData = async (
     .map((row) => ({
       id: (row as MemberGroupRow).id,
       name: (row as MemberGroupRow).name,
+      color: (row as MemberGroupRow).color,
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
 

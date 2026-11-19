@@ -35,6 +35,8 @@ interface MembersGroupPanelProps {
   selectedGroupId: string | null;
   editingGroupId: string | null;
   editingGroupName: string;
+  editingGroupColor: string;
+  onEditingGroupColorChange: (color: string) => void;
   onEditingGroupNameChange: (name: string) => void;
   onCancelEdit: () => void;
   onSaveGroupName: () => void;
@@ -64,6 +66,8 @@ export const MembersGroupPanel: React.FC<MembersGroupPanelProps> = ({
   selectedGroupId,
   editingGroupId,
   editingGroupName,
+  editingGroupColor,
+  onEditingGroupColorChange,
   onEditingGroupNameChange,
   onCancelEdit,
   onSaveGroupName,
@@ -134,6 +138,15 @@ export const MembersGroupPanel: React.FC<MembersGroupPanelProps> = ({
                   value={editingGroupName}
                   onChange={(event) => onEditingGroupNameChange(event.target.value)}
                   disabled={!isAdmin || groupActionLoading}
+                />
+                <input
+                  type="color"
+                  aria-label={t`Group colour`}
+                  title={t`Group colour`}
+                  value={editingGroupColor}
+                  onChange={(event) => onEditingGroupColorChange(event.target.value)}
+                  disabled={!isAdmin || groupActionLoading}
+                  className="h-9 w-11 cursor-pointer rounded-md border border-input bg-background p-1"
                 />
                 <Button
                   size="sm"
