@@ -141,6 +141,8 @@ export const createEmptyStatsByPeriod = (): Record<DashboardPeriod, DashboardSta
   day: createEmptyStatsVariants(),
   week: createEmptyStatsVariants(),
   month: createEmptyStatsVariants(),
+  year: createEmptyStatsVariants(),
+  all: createEmptyStatsVariants(),
   thisWeek: createEmptyStatsVariants(),
   nextWeek: createEmptyStatsVariants(),
   thisMonth: createEmptyStatsVariants(),

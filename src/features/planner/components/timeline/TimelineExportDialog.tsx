@@ -28,6 +28,18 @@ export function TimelineExportDialog() {
   const assignees = usePlannerStore(state => state.assignees);
   const filteredAssignees = useFilteredAssignees(assignees);
 
+  const liveFilters = usePlannerStore(state => state.filters);
+  const liveProjects = usePlannerStore(state => state.projects);
+  const liveGroups = usePlannerStore(state => state.memberGroups);
+  const liveStatuses = usePlannerStore(state => state.statuses);
+
+  const describeFilter = (
+    ids: string[],
+    items: Array<{ id: string; name: string }>
+  ) => ids.length
+    ? ids.map(id => items.find(item => item.id === id)?.name ?? id).join(', ')
+    : 'All';
+
   async function generate() {
     setError('');
     setBusy(true);
@@ -69,6 +81,51 @@ export function TimelineExportDialog() {
 
       const activeAssignees = filteredAssignees.filter(person => person.isActive);
 
+      const filters = state.filters;
+
+
+
+      const hasProjectFilter = filters.projectIds.length > 0;
+
+      const hasResourceFilter =
+        filters.assigneeIds.length > 0 ||
+        filters.groupIds.length > 0;
+
+      const hasTaskFilter =
+        filters.statusIds.length > 0 ||
+        filters.typeIds.length > 0 ||
+        filters.tagIds.length > 0;
+
+      const restrictTeamRows =
+        hasProjectFilter || hasTaskFilter;
+
+      const restrictProjectRows =
+        hasResourceFilter || hasTaskFilter;
+
+      const eligibleAssignees = selectVisibleAssignees({
+        groupMode: 'assignee',
+        filteredAssignees: activeAssignees,
+        filters,
+        assigneeGroupMap: groupMap,
+      }).filter(person => {
+        const team = teamNames.get(groupMap.get(person.id) ?? '');
+        return Boolean(team && team.trim().toLowerCase() !== 'unassigned');
+      });
+
+      const eligibleAssigneeIds = new Set(
+        eligibleAssignees.map(person => person.id)
+      );
+
+      const eligibleProjects = state.projects.filter(project =>
+        !project.archived &&
+        (!hasProjectFilter ||
+          filters.projectIds.includes(project.id))
+      );
+
+      const eligibleProjectIds = new Set(
+        eligibleProjects.map(project => project.id)
+      );
+
       function buildRows(groupMode: GroupMode) {
         const filteredTasks = selectFilteredTasks(
           inRange,
@@ -82,17 +139,52 @@ export function TimelineExportDialog() {
           },
         );
 
-        const visibleAssignees = selectVisibleAssignees({
-          groupMode,
-          filteredAssignees: activeAssignees,
-          filters: state.filters,
-          assigneeGroupMap: groupMap,
-        });
+        const matchingTasks = filteredTasks
+          .filter(task =>
+            !hasProjectFilter ||
+            Boolean(task.projectId &&
+              filters.projectIds.includes(task.projectId))
+          )
+          .filter(task =>
+            groupMode !== 'project' ||
+            !task.projectId ||
+            eligibleProjectIds.has(task.projectId)
+          )
+          .filter(task =>
+            !hasResourceFilter ||
+            task.assigneeIds.some(id => eligibleAssigneeIds.has(id))
+          )
+          .map(task =>
+            hasResourceFilter
+              ? {
+                  ...task,
+                  assigneeIds: task.assigneeIds.filter(
+                    id => eligibleAssigneeIds.has(id)
+                  ),
+                }
+              : task
+          );
+
+        const matchingAssigneeIds = new Set(
+          matchingTasks.flatMap(task => task.assigneeIds)
+        );
+
+        const matchingProjectIds = new Set(
+          matchingTasks.map(task => task.projectId)
+        );
+
+        const visibleAssignees = eligibleAssignees.filter(person =>
+          !restrictTeamRows || matchingAssigneeIds.has(person.id)
+        );
+
+        const visibleProjects = eligibleProjects.filter(project =>
+          !restrictProjectRows || matchingProjectIds.has(project.id)
+        );
 
         const groupItems = selectTimelineGroupItems({
           groupMode,
           visibleAssignees,
-          projects: state.projects,
+          projects: visibleProjects,
           myAssigneeId: resolveCurrentUserAssigneeId(
             state.assignees,
             auth.user?.id,
@@ -100,7 +192,7 @@ export function TimelineExportDialog() {
         });
 
         return groupTasksByTimelineRow({
-          filteredTasks,
+          filteredTasks: matchingTasks,
           groupItems,
           groupMode,
           layoutRange: { startDate: start, endDate: end },
@@ -131,6 +223,8 @@ export function TimelineExportDialog() {
       });
 
       for (const person of exportAssignees) {
+        if (!eligibleAssigneeIds.has(person.id)) continue;
+        if (restrictTeamRows) continue;
         if (teamRows.some(row => row.assigneeId === person.id)) continue;
 
         const timeOff = (state.timeOff ?? []).filter(record =>
@@ -157,6 +251,16 @@ export function TimelineExportDialog() {
       });
 
       const projectRows = Object.entries(projectTasks)
+        .filter(([id, tasks]) => {
+          if (id === 'unassigned') {
+            return !hasProjectFilter && tasks.length > 0;
+          }
+
+          if (!eligibleProjectIds.has(id)) return false;
+          if (restrictProjectRows && tasks.length === 0) return false;
+
+          return true;
+        })
         .map(([id, tasks]) => {
           const project = state.projects.find(p => p.id === id);
           return {
@@ -169,7 +273,8 @@ export function TimelineExportDialog() {
         .sort((a, b) => a.name.localeCompare(b.name));
 
       // Include projects without scheduled allocations.
-      for (const project of state.projects) {
+      for (const project of eligibleProjects) {
+        if (restrictProjectRows) continue;
         if (project.archived) continue;
 
         if (
@@ -217,9 +322,6 @@ export function TimelineExportDialog() {
           state.filters.projectIds.includes(milestone.projectId)),
       );
 
-      const { exportTimelinePdf } = await import(
-        '@/features/planner/lib/timelinePdfExport'
-      );
 
       exportTimelinePdf({
         startDate: start,
@@ -233,7 +335,9 @@ export function TimelineExportDialog() {
         ].filter(Boolean).join(' - '),
         teamRows: teamRows.filter(row =>
           row.assigneeId !== 'unassigned' &&
-          row.team?.trim().toLowerCase() !== 'unassigned'
+          eligibleAssigneeIds.has(row.assigneeId) &&
+          row.team?.trim().toLowerCase() !== 'unassigned' &&
+          (!restrictTeamRows || row.tasks.length > 0)
         ),
         projectRows,
         projects: state.projects,
@@ -320,8 +424,19 @@ export function TimelineExportDialog() {
               <div>2. Project overview</div>
               <div className="text-muted-foreground text-xs">
                 Current filters applied. Automatic pagination.
-                Empty resource and project rows included.
+                Empty rows included where relevant to active filters.
               </div>
+            </div>
+
+            <div className="rounded-md border p-3 text-xs space-y-2">
+              <div className="text-sm font-semibold">Active filters</div>
+              <div>Projects: {describeFilter(liveFilters.projectIds, liveProjects)}</div>
+              <div>People: {describeFilter(liveFilters.assigneeIds, assignees)}</div>
+              <div>Team groups: {describeFilter(liveFilters.groupIds, liveGroups)}</div>
+              <div>Statuses: {describeFilter(liveFilters.statusIds, liveStatuses)}</div>
+              <div>Task types selected: {liveFilters.typeIds.length || 'All'}</div>
+              <div>Tags selected: {liveFilters.tagIds.length || 'All'}</div>
+              <div>Hide unassigned: {liveFilters.hideUnassigned ? 'Yes' : 'No'}</div>
             </div>
 
             {error && (
