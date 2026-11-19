@@ -92,7 +92,15 @@ export const WidgetEditorDialog: React.FC<WidgetEditorDialogProps> = ({
   const [chartStyle, setChartStyle] = useState<ChartWidgetType>('bar');
   const [groupBy, setGroupBy] = useState<DashboardGroupBy>('none');
   const [period, setPeriod] = useState<DashboardPeriod>('week');
-  const periodOptions = dashboardPeriodOptions(calendarPeriodsOn, period);
+  const periodOptions = [
+    ...dashboardPeriodOptions(calendarPeriodsOn, period),
+    ...(primaryType === 'milestone'
+      ? [
+          { value: 'year' as const, label: 'Full year' },
+          { value: 'all' as const, label: 'All' },
+        ]
+      : []),
+  ];
   const [includeUnassigned, setIncludeUnassigned] = useState(true);
   const [includeDisabledAssignees, setIncludeDisabledAssignees] = useState(false);
   const [size, setSize] = useState<'small' | 'medium' | 'large'>('small');
@@ -209,8 +217,13 @@ export const WidgetEditorDialog: React.FC<WidgetEditorDialogProps> = ({
   useEffect(() => {
     if (isMilestoneCalendar && period !== 'month') {
       setPeriod('month');
+    } else if (
+      primaryType !== 'milestone' &&
+      (period === 'year' || period === 'all')
+    ) {
+      setPeriod('week');
     }
-  }, [isMilestoneCalendar, period]);
+  }, [isMilestoneCalendar, period, primaryType]);
 
   useEffect(() => {
     if (initialWidget) return;
@@ -247,7 +260,12 @@ export const WidgetEditorDialog: React.FC<WidgetEditorDialogProps> = ({
         }))
         .filter((group) => group.rules.length > 0)
       : [];
-    const normalizedPeriod = nextIsMilestone && milestoneView === 'calendar' ? 'month' : period;
+    const normalizedPeriod =
+      nextIsMilestone && milestoneView === 'calendar'
+        ? 'month'
+        : !nextIsMilestone && (period === 'year' || period === 'all')
+          ? 'week'
+          : period;
     const nextWidget: DashboardWidget = {
       id: widgetId,
       title: title.trim(),
@@ -340,7 +358,10 @@ export const WidgetEditorDialog: React.FC<WidgetEditorDialogProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {periodOptions.map((option) => (
+                  {periodOptions.filter(option =>
+                    !isMilestoneCalendar ||
+                    (option.value !== 'year' && option.value !== 'all')
+                  ).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>

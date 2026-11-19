@@ -75,7 +75,7 @@ export const createWidgetId = () => {
 };
 
 export const DASHBOARD_CALENDAR_PERIODS = ['thisWeek', 'nextWeek', 'thisMonth', 'nextMonth'] as const;
-const DASHBOARD_PERIODS: readonly DashboardPeriod[] = ['day', 'week', 'month', ...DASHBOARD_CALENDAR_PERIODS];
+const DASHBOARD_PERIODS: readonly DashboardPeriod[] = ['day', 'week', 'month', 'year', 'all', ...DASHBOARD_CALENDAR_PERIODS];
 
 export const isDashboardPeriod = (value: unknown): value is DashboardPeriod => (
   typeof value === 'string' && (DASHBOARD_PERIODS as readonly string[]).includes(value)

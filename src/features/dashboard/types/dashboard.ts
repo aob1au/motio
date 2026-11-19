@@ -3,7 +3,11 @@
 // calendar week (Monday to Sunday, ISO) or month, this one or the next.
 export type DashboardRollingPeriod = 'day' | 'week' | 'month';
 export type DashboardCalendarPeriod = 'thisWeek' | 'nextWeek' | 'thisMonth' | 'nextMonth';
-export type DashboardPeriod = DashboardRollingPeriod | DashboardCalendarPeriod;
+export type DashboardMilestoneExtendedPeriod = 'year' | 'all';
+export type DashboardPeriod =
+  | DashboardRollingPeriod
+  | DashboardCalendarPeriod
+  | DashboardMilestoneExtendedPeriod;
 
 export type DashboardWidgetType =
   | 'kpi'

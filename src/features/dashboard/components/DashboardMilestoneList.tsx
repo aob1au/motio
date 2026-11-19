@@ -56,18 +56,25 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
         ? now
         : period === 'week'
           ? addWeeks(now, 1)
-          : addMonths(now, 1),
+          : addMonths(now, period === 'year' ? 12 : 1),
     );
-  const periodLabel = formatShortDateRange(
-    format(milestoneRangeStart, 'yyyy-MM-dd'),
-    format(milestoneRangeEnd, 'yyyy-MM-dd'),
-    dateLocale,
-  );
+  const extendedPeriod = period === 'year' || period === 'all';
+
+  const periodLabel = period === 'all'
+    ? 'All dates'
+    : period === 'year'
+      ? `${format(milestoneRangeStart, 'd MMM yyyy', { locale: dateLocale })} - ${format(milestoneRangeEnd, 'd MMM yyyy', { locale: dateLocale })}`
+      : formatShortDateRange(
+          format(milestoneRangeStart, 'yyyy-MM-dd'),
+          format(milestoneRangeEnd, 'yyyy-MM-dd'),
+          dateLocale,
+        );
   const cleanProjectName = (name: string | undefined) =>
     name?.replace(/^\s*\[[^\]]+\]\s*/, '').trim();
 
   const milestonesInRange = milestones
-    .filter((milestone) => isWithinInterval(parseISO(milestone.date), {
+    .filter((milestone) => period === 'all' ||
+      isWithinInterval(parseISO(milestone.date), {
       start: milestoneRangeStart,
       end: milestoneRangeEnd,
     }))
@@ -187,7 +194,7 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
                       {milestone.title}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                      {format(parseISO(milestone.date), 'd MMM', { locale: dateLocale })}
+                      {format(parseISO(milestone.date), extendedPeriod ? 'd MMM yyyy' : 'd MMM', { locale: dateLocale })}
                     </div>
                   </div>
                 </div>
@@ -215,7 +222,7 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
                             {' - '}{milestone.title}
                           </span>
                           <span className="text-muted-foreground">
-                            {format(parseISO(milestone.date), 'd MMM', { locale: dateLocale })}
+                            {format(parseISO(milestone.date), extendedPeriod ? 'd MMM yyyy' : 'd MMM', { locale: dateLocale })}
                           </span>
                         </div>
                       ))}
@@ -252,7 +259,7 @@ export const DashboardMilestoneList: React.FC<DashboardMilestoneListProps> = ({
                       {milestone.title}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                      {format(parseISO(milestone.date), 'd MMM', { locale: dateLocale })}
+                      {format(parseISO(milestone.date), extendedPeriod ? 'd MMM yyyy' : 'd MMM', { locale: dateLocale })}
                     </div>
                   </div>
                 </div>
