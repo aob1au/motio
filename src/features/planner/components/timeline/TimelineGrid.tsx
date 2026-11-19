@@ -174,6 +174,54 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     }
   }, [collapsedTeamGroups]);
 
+  const [groupByProject, setGroupByProject] = useState(() => {
+    try {
+      return window.localStorage.getItem(
+        'motio-project-group-by-v1'
+      ) !== 'none';
+    } catch {
+      return true;
+    }
+  });
+
+  const [collapsedProjects, setCollapsedProjects] =
+    useState<Record<string, boolean>>(() => {
+      try {
+        const value: unknown = JSON.parse(
+          window.localStorage.getItem(
+            'motio-project-collapsed-v1'
+          ) || '{}'
+        );
+        return value && typeof value === 'object' && !Array.isArray(value)
+          ? value as Record<string, boolean>
+          : {};
+      } catch {
+        return {};
+      }
+    });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'motio-project-group-by-v1',
+        groupByProject ? 'project' : 'none'
+      );
+    } catch {
+      // Storage unavailable.
+    }
+  }, [groupByProject]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'motio-project-collapsed-v1',
+        JSON.stringify(collapsedProjects)
+      );
+    } catch {
+      // Storage unavailable.
+    }
+  }, [collapsedProjects]);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sidebarContainerRef = useRef<HTMLDivElement>(null);
 
@@ -623,11 +671,17 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
         name: string;
         count: number;
         collapsed: boolean;
+        projectHeading?: boolean;
+        color?: string;
       }
     | {
         kind: 'resource';
         row: typeof adjustedDisplayRows[number];
         rowIndex: number;
+        projectName?: string;
+        projectColor?: string;
+        projectCount?: number;
+        projectCollapsed?: boolean;
       };
 
   const groupingEnabled = groupMode === 'assignee' && groupByTeam;
@@ -636,6 +690,56 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     const flat: TimelineItem[] = adjustedDisplayRows.map(
       (row, rowIndex) => ({ kind: 'resource', row, rowIndex })
     );
+
+
+    if (groupMode === 'project') {
+      const sorted = adjustedDisplayRows
+        .map((row, rowIndex) => ({ row, rowIndex }))
+        .sort((a, b) =>
+          String(a.row.name ?? '').localeCompare(
+            String(b.row.name ?? ''),
+            undefined,
+            { sensitivity: 'base', numeric: true }
+          )
+        );
+
+      const output: TimelineItem[] = [];
+
+      sorted.forEach(({ row, rowIndex }) => {
+        if (!groupByProject) {
+          output.push({ kind: 'resource', row, rowIndex });
+          return;
+        }
+
+        const key = `${currentWorkspaceId ?? 'default'}:${row.id}`;
+        const collapsed = Boolean(collapsedProjects[key]);
+
+        const details = row as unknown as {
+          tasks?: unknown[];
+          taskCount?: number;
+          count?: number;
+          color?: string;
+        };
+
+        const count =
+          details.taskCount ??
+          details.count ??
+          details.tasks?.length ??
+          0;
+
+        output.push({
+          kind: 'resource',
+          row,
+          rowIndex,
+          projectName: String(row.name ?? ''),
+          projectColor: details.color,
+          projectCount: count,
+          projectCollapsed: collapsed,
+        });
+      });
+
+      return output;
+    }
 
     if (!groupingEnabled) return flat;
 
@@ -705,6 +809,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
   }, [
     adjustedDisplayRows, groupingEnabled, memberGroups,
     assigneeGroupMap, currentWorkspaceId, collapsedTeamGroups,
+    groupMode, groupByProject, collapsedProjects,
   ]);
 
   const toggleTeamGroup = useCallback((id: string) => {
@@ -715,6 +820,28 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
       [key]: !previous[key],
     }));
   }, [currentWorkspaceId]);
+
+  const toggleProjectGroup = useCallback((id: string) => {
+    const key = `${currentWorkspaceId ?? 'default'}:${id}`;
+
+    setCollapsedProjects(previous => ({
+      ...previous,
+      [key]: !previous[key],
+    }));
+  }, [currentWorkspaceId]);
+
+  const setAllProjectsCollapsed = useCallback((collapsed: boolean) => {
+    setCollapsedProjects(previous => {
+      const next = { ...previous };
+
+      adjustedDisplayRows.forEach(row => {
+        const key = `${currentWorkspaceId ?? 'default'}:${row.id}`;
+        next[key] = collapsed;
+      });
+
+      return next;
+    });
+  }, [adjustedDisplayRows, currentWorkspaceId]);
 
   const setResourceRowHeight = useCallback((
     rowId: string,
@@ -894,6 +1021,46 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
           </select>
         </div>
       )}
+      {groupMode === 'project' && (
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2">
+          <label
+            htmlFor="motio-project-group-by"
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Group by
+          </label>
+          <select
+            id="motio-project-group-by"
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+            value={groupByProject ? 'project' : 'none'}
+            onChange={event =>
+              setGroupByProject(event.target.value === 'project')
+            }
+          >
+            <option value="none">None</option>
+            <option value="project">Project</option>
+          </select>
+
+          {groupByProject && (
+            <>
+              <button
+                type="button"
+                className="h-8 rounded-md border border-input px-3 text-xs hover:bg-muted"
+                onClick={() => setAllProjectsCollapsed(false)}
+              >
+                Expand all
+              </button>
+              <button
+                type="button"
+                className="h-8 rounded-md border border-input px-3 text-xs hover:bg-muted"
+                onClick={() => setAllProjectsCollapsed(true)}
+              >
+                Collapse all
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <TimelineDragScrollContext.Provider value={dragScrollController}>
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div
@@ -982,21 +1149,30 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
             {timelineItems.map((item) => {
               if (item.kind === 'heading') return (
                 <div
-                  key={`team-${item.id}`}
+                  key={`${item.projectHeading ? 'project' : 'team'}-${item.id}`}
                   className="flex"
-                  data-testid={`timeline-team-${item.id}`}
+                  data-testid={`timeline-${item.projectHeading ? 'project' : 'team'}-${item.id}`}
                 >
                   <button
                     type="button"
                     className="sticky left-0 z-10 flex-shrink-0 border-r border-b border-border bg-[#D0D3D4] px-3 text-left text-base font-bold text-[#333333] hover:bg-[#C2C7CA]"
                     style={{ width: resolvedSidebarWidth, height: 36 }}
                     aria-expanded={!item.collapsed}
-                    onClick={() => toggleTeamGroup(item.id)}
-                    title={item.collapsed ? 'Expand team' : 'Collapse team'}
+                    onClick={() => item.projectHeading
+                      ? toggleProjectGroup(item.id)
+                      : toggleTeamGroup(item.id)
+                    }
+                    title={`${item.collapsed ? 'Expand' : 'Collapse'} ${item.projectHeading ? 'project' : 'team'}`}
                   >
                     <span className="mr-2">
                       {item.collapsed ? '▸' : '▾'}
                     </span>
+                    {item.projectHeading && item.color && (
+                      <span
+                        className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                    )}
                     <span className="truncate">
                       {item.name} ({item.count})
                     </span>
@@ -1010,6 +1186,12 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
 
               const row = item.row;
               const rowIndex = item.rowIndex;
+              const integratedProject =
+                groupMode === 'project' && groupByProject;
+              const projectCollapsed =
+                integratedProject && Boolean(item.projectCollapsed);
+              const renderedHeight =
+                projectCollapsed ? 36 : row.height;
 
               return (
               <div
@@ -1017,6 +1199,59 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                 className="flex"
                 data-tour={rowIndex === 0 ? 'timeline-first-row' : undefined}
               >
+                {integratedProject ? (
+                  <div
+                    className="sticky left-0 z-10 flex-shrink-0 border-r border-b border-border bg-[#D0D3D4] text-[#333333] relative"
+                    style={{
+                      width: resolvedSidebarWidth,
+                      height: renderedHeight,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-base font-bold hover:bg-[#C2C7CA]"
+                      aria-expanded={!projectCollapsed}
+                      onClick={() => toggleProjectGroup(row.id)}
+                      title={projectCollapsed ? 'Expand project' : 'Collapse project'}
+                    >
+                      <span className="shrink-0 text-sm">
+                        {projectCollapsed ? '▸' : '▾'}
+                      </span>
+                      {item.projectColor && (
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: item.projectColor }}
+                        />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">
+                        {item.projectName}
+                      </span>
+                      <span className="shrink-0 text-xs font-medium">
+                        {item.projectCount}
+                      </span>
+                    </button>
+
+                    {!projectCollapsed && !isMobile && (
+                      <div
+                        role="separator"
+                        aria-orientation="horizontal"
+                        aria-label="Resize project row"
+                        className="absolute inset-x-0 bottom-0 z-20 h-2 cursor-row-resize hover:bg-black/10"
+                        onPointerDown={(event) =>
+                          handleResourceRowResizeStart(
+                            event,
+                            row.id,
+                            row.height,
+                            rowContentMinHeight(row)
+                          )
+                        }
+                        onDoubleClick={() =>
+                          handleResourceRowResizeReset(row.id)
+                        }
+                      />
+                    )}
+                  </div>
+                ) : (
                 <TimelineSidebarRow
                   row={row}
                   width={resolvedSidebarWidth}
@@ -1036,6 +1271,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                     ? handleResourceRowResizeReset
                     : undefined}
                 />
+                )}
                 <div
                   data-testid={`timeline-task-row-${row.id}`}
                   className="relative flex-shrink-0"
@@ -1051,13 +1287,14 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
                     holidayDates={holidayDates}
                     timeOffDays={timeOffIndex.daysByRowId.get(row.id)}
                     timeOffMotif={motifByRowId.get(row.id)}
-                    height={row.height}
-                    // Viewers too: double-click opens the dialog in time-off-only mode.
-                    canEdit
-                    canCreateTask={canEdit}
+                    height={renderedHeight}
+                    // Prevent task creation inside collapsed project rows.
+                    canEdit={!projectCollapsed}
+                    canCreateTask={canEdit && !projectCollapsed}
                     onCreateTask={handleCreateTaskAt}
                   >
-                    {rowTaskElementsById.get(row.id)}
+                    {!projectCollapsed &&
+                      rowTaskElementsById.get(row.id)}
                   </TimelineRow>
                 </div>
               </div>

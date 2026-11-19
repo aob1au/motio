@@ -1,3 +1,4 @@
+import { EmailLink } from '@/shared/ui/EmailLink';
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { t } from '@lingui/macro';
 import { Check, Copy, Mail, Phone } from 'lucide-react';
@@ -163,7 +164,9 @@ interface PopupRowProps {
 const PopupRow: React.FC<PopupRowProps> = ({ icon, value, copied, onCopy, ariaLabel }) => (
   <div className="flex items-center gap-2.5 rounded-md bg-muted px-3 py-2 text-muted-foreground">
     {icon}
-    <span className="flex-1 truncate text-[12px] tabular-nums text-foreground">{value}</span>
+    <span className="flex-1 truncate text-[12px] tabular-nums text-foreground">{/^[^\s@]+@[^\s@]+$/.test(value.trim())
+              ? <EmailLink email={value} />
+              : value}</span>
     <button
       type="button"
       onClick={onCopy}
