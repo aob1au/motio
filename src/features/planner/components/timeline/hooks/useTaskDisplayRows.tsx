@@ -30,6 +30,7 @@ interface UseTaskDisplayRowsParams {
   groupMode: GroupMode;
   myAssigneeId: string | null;
   assigneeGroupMap: Map<string, string>;
+  resourceSortKey?: (id: string) => string;
   visibleDays: Date[];
   dayWidth: number;
   canEdit: boolean;
@@ -60,6 +61,7 @@ export const useTaskDisplayRows = ({
   groupMode,
   myAssigneeId,
   assigneeGroupMap,
+  resourceSortKey,
   visibleDays,
   dayWidth,
   canEdit,
@@ -159,6 +161,7 @@ export const useTaskDisplayRows = ({
 
   const tasksByRow = useMemo(
     () => groupTasksByTimelineRow({
+      resourceSortKey,
       filteredTasks,
       groupItems,
       groupMode,
@@ -169,7 +172,7 @@ export const useTaskDisplayRows = ({
       layoutRange: rangeStart && rangeEnd ? { startDate: rangeStart, endDate: rangeEnd } : undefined,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the memory is read, not tracked (see above)
-    [filteredTasks, groupItems, groupMode, reservedLaneZeroByRow, layoutKey],
+    [filteredTasks, groupItems, groupMode, reservedLaneZeroByRow, layoutKey, resourceSortKey],
   );
 
   const effectiveMinRowHeight = groupMode === 'assignee' && geometry.tieredAvatars

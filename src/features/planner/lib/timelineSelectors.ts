@@ -1,5 +1,5 @@
 import { Assignee, Filters, GroupMode, MemberGroupAssignment, Project, Task } from '@/features/planner/types/planner';
-import { LayoutRange, RememberedLane, ReservedPeriod, TaskWithLane, calculateTaskLanes, getMaxLanes } from '@/features/planner/lib/taskLanes';
+import { LayoutRange, RememberedLane, ReservedPeriod, TaskWithLane, calculateTaskLanes, calculateProjectResourceLanes, getMaxLanes } from '@/features/planner/lib/taskLanes';
 import { formatProjectLabel } from '@/shared/lib/projectLabels';
 import { DEFAULT_NEUTRAL_COLOR } from '@/shared/lib/colors';
 import { ROW_BOTTOM_SPACE, ROW_TOP_PADDING } from '@/features/planner/lib/dateUtils';
@@ -178,6 +178,7 @@ export const selectTimelineGroupItems = ({
 };
 
 export const groupTasksByTimelineRow = ({
+  resourceSortKey,
   filteredTasks,
   groupItems,
   groupMode,
@@ -185,6 +186,7 @@ export const groupTasksByTimelineRow = ({
   previousLanesByRow,
   layoutRange,
 }: {
+  resourceSortKey?: (id: string) => string;
   filteredTasks: Task[];
   groupItems: TimelineGroupItem[];
   groupMode: GroupMode;
@@ -235,6 +237,11 @@ export const groupTasksByTimelineRow = ({
   });
 
   Object.entries(tasksPerGroup).forEach(([groupId, rowTasks]) => {
+    if (groupMode === 'project') {
+      grouped[groupId] = calculateProjectResourceLanes(rowTasks, resourceSortKey);
+      return;
+    }
+
     grouped[groupId] = calculateTaskLanes(
       rowTasks,
       reservedLaneZeroByRow?.[groupId],
