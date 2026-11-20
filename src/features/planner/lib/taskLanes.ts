@@ -255,3 +255,37 @@ export const getMaxLanes = (tasksWithLanes: TaskWithLane[]): number => {
   if (tasksWithLanes.length === 0) return 1;
   return Math.max(...tasksWithLanes.map(t => t.lane)) + 1;
 };
+
+export const calculateProjectResourceLanes = (
+  tasks: Task[],
+  resourceSortKey: (id: string) => string = id => id,
+): TaskWithLane[] => {
+  const groups = new Map<string, Task[]>();
+
+  for (const task of tasks) {
+    const key = [...new Set(task.assigneeIds)].sort().join(',');
+    const group = groups.get(key) ?? [];
+    group.push(task);
+    groups.set(key, group);
+  }
+
+  const sortKey = (key: string) =>
+    key ? key.split(',').map(resourceSortKey).sort().join('|') : '\uffff';
+
+  const result: TaskWithLane[] = [];
+  let offset = 0;
+
+  const ordered = [...groups.entries()].sort(
+    ([a], [b]) => sortKey(a).localeCompare(sortKey(b)) || a.localeCompare(b),
+  );
+
+  for (const [, group] of ordered) {
+    const packed = calculateTaskLanes(group);
+    for (const task of packed) {
+      result.push(wrapWithLane(task, task.lane + offset));
+    }
+    offset += getMaxLanes(packed);
+  }
+
+  return result;
+};

@@ -1,3 +1,4 @@
+import { calculateProjectResourceLanes, getMaxLanes } from '@/features/planner/lib/taskLanes';
 import { jsPDF } from 'jspdf';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
 import type { Task, Project, Assignee, Status, Milestone, TimeOff, MemberGroup, MemberGroupAssignment } from '@/features/planner/types/planner';
@@ -298,12 +299,32 @@ export function exportTimelinePdf(options: TimelinePdfOptions) {
 
       const laneEnds: string[] = [];
 
-      const positioned = bars.map(bar => {
-        let lane = laneEnds.findIndex(end => end < bar.startDate);
-        if (lane === -1) lane = laneEnds.length;
-        laneEnds[lane] = bar.endDate;
-        return { ...bar, lane };
-      });
+      const positioned = section.startsWith('2.')
+        ? (() => {
+            const packed = calculateProjectResourceLanes(
+              bars.flatMap(bar => bar.task ? [bar.task] : []),
+              id => {
+                const groupId = assigneeGroupMap.get(id);
+                const group = options.memberGroups?.find(g => g.id === groupId);
+                return `${group?.name ?? 'zzzz'}|${personMap.get(id)?.name ?? id}`;
+              },
+            );
+            const lanes = new Map(packed.map(task => [task.id, task.lane]));
+            laneEnds.length = getMaxLanes(packed);
+            return bars.map(bar => {
+              const lane = bar.task ? lanes.get(bar.task.id) : undefined;
+              if (lane !== undefined) return { ...bar, lane };
+              const extraLane = laneEnds.length;
+              laneEnds.push(bar.endDate);
+              return { ...bar, lane: extraLane };
+            });
+          })()
+        : bars.map(bar => {
+            let lane = laneEnds.findIndex(end => end < bar.startDate);
+            if (lane === -1) lane = laneEnds.length;
+            laneEnds[lane] = bar.endDate;
+            return { ...bar, lane };
+          });
 
       const maxLanes = Math.max(
         1, Math.floor((bottom - 65) / laneHeight),

@@ -570,6 +570,13 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
 
   // ─── Task display ──────────────────────────────────────────────────────────
 
+  const resourceSortKey = useMemo(() => (id: string) => {
+      const groupId = assigneeGroupMap.get(id);
+      const group = memberGroups.find(g => g.id === groupId);
+      const person = assignees.find(a => a.id === id);
+      return `${group?.name ?? 'zzzz'}|${person?.name ?? id}`;
+  }, [assignees, memberGroups, assigneeGroupMap]);
+
   const { displayRows, rowTaskElementsById, geometry } = useTaskDisplayRows({
     tasks,
     filters,
@@ -579,6 +586,7 @@ export const TimelineGrid: React.FC<TimelineGridProps> = ({
     groupMode,
     myAssigneeId,
     assigneeGroupMap,
+    resourceSortKey,
     visibleDays,
     dayWidth,
     canEdit,
